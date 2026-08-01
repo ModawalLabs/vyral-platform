@@ -1,0 +1,24 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+
+/**
+ * SSR-safe media query subscription. Returns `false` on the server so the
+ * markup matches the client's first paint before hydration.
+ */
+export function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const list = window.matchMedia(query);
+      list.addEventListener("change", onChange);
+      return () => list.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** Matches Tailwind's `md` breakpoint. */
+export function useIsMobile() {
+  return useMediaQuery("(max-width: 767px)");
+}

@@ -1,0 +1,2 @@
+# Static assets served from the root path. Kept in git so Docker's
+# `COPY /app/public` step has a directory to copy.
