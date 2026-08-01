@@ -1,0 +1,22 @@
+# Normalize to LF in the repository regardless of contributor OS, so Prettier
+# and the Docker build see identical files everywhere.
+* text=auto eol=lf
+
+# Shell scripts and git hooks must be LF or they fail in containers.
+*.sh text eol=lf
+.husky/* text eol=lf
+
+# Never munge binaries.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Collapse lockfile noise in diffs and PR reviews.
+package-lock.json linguist-generated=true -diff
