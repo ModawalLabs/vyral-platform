@@ -39,6 +39,18 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-text: var(--brand-text);
+  --color-brand-on-media: var(--brand-on-media);
+  --color-warning-on-media: var(--warning-on-media);
+  --color-danger-on-media: var(--danger-on-media);
+  --color-stale: var(--stale);
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-composer: var(--composer);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,6 +93,101 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Brand — the violet→purple ramp carried over from the landing site. */
+  --brand: oklch(0.55 0.25 287);
+  --brand-accent: oklch(0.63 0.26 304);
+  --brand-foreground: oklch(0.985 0 0);
+
+  /*
+   * Brand violet darkened for use as text. Deliberately NOT overridden in dark
+   * mode: it is only ever set on a near-white plate (the "Try now" chip), so
+   * lightening it for the dark theme would drop it below AA against that plate.
+   */
+  --brand-ink: oklch(0.45 0.24 287);
+
+  /*
+   * Brand violet for small text on the app's own surfaces (card, popover,
+   * background) — the version-history toggle is the current user.
+   *
+   * Unlike --brand-ink and --brand-on-media above, this one IS overridden in
+   * dark mode, because the surface it sits on genuinely flips. --brand itself
+   * is not a substitute: as an 11px label it measures 4.0:1 on the dark card,
+   * under the 4.5:1 it needs at that size. Darker here, lighter there, both
+   * comfortably clear.
+   */
+  --brand-text: oklch(0.48 0.24 287);
+
+  /*
+   * The opposite case: brand violet lightened for text sitting directly on a
+   * dark media scrim. Also not overridden in dark mode — the scrim over card
+   * artwork is dark in both themes, so a theme-reactive value would go dark on
+   * dark exactly where it must not.
+   */
+  --brand-on-media: oklch(0.8 0.15 300);
+
+  /*
+   * Status labels on the same dark card scrims, so they follow the same rule as
+   * --brand-on-media: fixed across themes, and lightened well past the usual
+   * amber/red so they stay readable over arbitrary artwork.
+   */
+  --warning-on-media: oklch(0.85 0.16 86);
+  --danger-on-media: oklch(0.72 0.19 25);
+
+  /* Glass. On a light page the frosted plate is a white veil over the
+     backdrop; the sheen has to stay near-opaque or the bevel disappears. */
+  --glass: oklch(1 0 0 / 55%);
+  /* A touch heavier than the dark-mode bevel: dark-on-light edges read weaker
+     at the same alpha, and these cards sit on a near-white page. */
+  --glass-border: oklch(0.145 0 0 / 13%);
+  --glass-sheen: oklch(1 0 0 / 75%);
+
+  /* Glass display type. Dark ink on a light page needs noticeably more alpha
+     than light ink on a dark one to land at the same perceived weight. */
+  --glass-text-top: oklch(0.145 0 0 / 40%);
+  --glass-text-mid: oklch(0.145 0 0 / 14%);
+  /* The bevel is the heaviest thing on the wordmark in light mode — at a
+     higher alpha it outlines the letters in grey instead of catching light. */
+  --glass-text-rim: oklch(0.145 0 0 / 18%);
+
+  /* Dispersion at the bevel and inside the travelling highlight. Darker and
+     more saturated than the dark-mode pair, which would wash out on white. */
+  --glass-iris-warm: oklch(0.58 0.22 300);
+  --glass-iris-cool: oklch(0.62 0.13 218);
+  --glass-shine-warm: oklch(0.66 0.2 300 / 40%);
+  /* Softer than the dark-mode core: here the specular lightens dark ink, and
+     at full strength it erases the letter it is crossing. */
+  --glass-shine-core: oklch(1 0 0 / 72%);
+  --glass-shine-cool: oklch(0.72 0.14 210 / 40%);
+
+  /* Raised surface inside the glass frame — must read as a distinct panel
+     against --background, which is pure white here. */
+  --composer: oklch(0.975 0 0);
+
+  /* Background doodle field. Dark ink on a white page carries further than
+     light ink on a dark one, so light mode needs the lower value to land at
+     the same "barely there". */
+  --doodle-opacity: 0.045;
+
+  /*
+   * The theatre photograph behind the brief card.
+   *
+   * Same asymmetry as the doodles but sharper, because this is a *dark*
+   * photograph rather than line art, and it is composited with a different blend
+   * mode per theme — see `.brief-texture`.
+   *
+   * Both values were picked by measurement, not by eye: rendering the card with and
+   * without the layer and diffing the pixels puts light 0.07 at a mean shift of
+   * 5.6/255 and dark 0.10 at 6.0/255, so the two themes land at the same "barely
+   * there" instead of one being twice the other. Raise them together or the balance
+   * goes.
+   */
+  --brief-texture-opacity: 0.07;
+
+  /* "This does not add up" — a duration overage, a platform mismatch. Amber
+     rather than red on purpose: nothing here is an error, and none of it
+     blocks the user. */
+  --stale: oklch(0.62 0.15 76);
 }
 
 .dark {
@@ -115,6 +222,37 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Lifted slightly: the same violet loses apparent chroma on a dark field. */
+  --brand: oklch(0.585 0.25 287);
+  --brand-accent: oklch(0.66 0.26 304);
+  --brand-foreground: oklch(0.985 0 0);
+
+  /* Lifted much further than --brand: this one carries 11px text, which needs
+     4.5:1 rather than the 3:1 a button fill gets away with. */
+  --brand-text: oklch(0.72 0.19 292);
+
+  --glass: oklch(1 0 0 / 6%);
+  --glass-border: oklch(1 0 0 / 14%);
+  --glass-sheen: oklch(1 0 0 / 20%);
+
+  --glass-text-top: oklch(0.985 0 0 / 64%);
+  --glass-text-mid: oklch(0.985 0 0 / 28%);
+  --glass-text-rim: oklch(0.985 0 0 / 44%);
+
+  --glass-iris-warm: oklch(0.75 0.18 302);
+  --glass-iris-cool: oklch(0.85 0.12 205);
+  --glass-shine-warm: oklch(0.78 0.16 300 / 45%);
+  --glass-shine-core: oklch(1 0 0 / 92%);
+  --glass-shine-cool: oklch(0.88 0.11 205 / 45%);
+
+  --composer: oklch(0.27 0.004 286);
+
+  --doodle-opacity: 0.06;
+  --brief-texture-opacity: 0.1;
+
+  /* Lifted for a dark field, same as the brand ramp. */
+  --stale: oklch(0.78 0.15 78);
 }
 
 @layer base {
@@ -126,5 +264,276 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  /*
+   * Liquid-glass display type — see `GlassWordmark`, which supplies the markup.
+   *
+   * `backdrop-filter` cannot be clipped to glyphs in any shipping browser, so
+   * the glass read is composed from three copies of the same word rather than
+   * filtered:
+   *
+   *   body  — the translucent frosted fill, with a neutral bevel and colour
+   *            fringing at the edges
+   *   shine — a specular band that sweeps across, then rests
+   *
+   * It still needs something coloured behind it, or the translucent fill has
+   * nothing to refract — see the aura in the page that uses it.
+   */
+  .glass-word {
+    position: relative;
+    display: inline-block;
+    isolation: isolate;
+  }
+
+  /*
+   * Both layers are positioned so that DOM order alone decides paint order.
+   * Without `position` on the body, the absolutely-positioned shine would paint
+   * above it anyway — positioned elements form a later paint layer than in-flow
+   * content regardless of source order — but making it explicit keeps the
+   * stack readable.
+   */
+  .glass-word-body {
+    position: relative;
+  }
+
+  .glass-word-shine {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .glass-word-body,
+  .glass-word-shine {
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  .glass-word-body {
+    background-image: linear-gradient(
+      170deg,
+      var(--glass-text-top) 0%,
+      var(--glass-text-mid) 55%,
+      var(--glass-text-top) 100%
+    );
+    -webkit-text-stroke: 1.5px var(--glass-text-rim);
+    /*
+     * All of this paints behind the transparent fill, so it reads as light
+     * moving through the plate rather than as a drop shadow.
+     *
+     * The first two are chromatic aberration: copies nudged a pixel either way
+     * in violet and cyan. Only the sliver past the bevel escapes, which is why
+     * the dispersion lands on the edges instead of tinting the whole letter —
+     * a gradient-filled copy behind translucent glass would colour all of it.
+     */
+    text-shadow:
+      -1px 0 0 color-mix(in oklab, var(--glass-iris-warm) 26%, transparent),
+      1px 0 0 color-mix(in oklab, var(--glass-iris-cool) 26%, transparent),
+      0 1px 0 color-mix(in oklab, var(--glass-sheen) 60%, transparent),
+      0 24px 60px color-mix(in oklab, var(--brand) 30%, transparent);
+  }
+
+  .glass-word-shine {
+    background-image: linear-gradient(
+      100deg,
+      transparent 42%,
+      var(--glass-shine-warm) 46%,
+      var(--glass-shine-core) 50%,
+      var(--glass-shine-cool) 54%,
+      transparent 58%
+    );
+    /*
+     * 200%, not more. `background-position` percentages resolve against
+     * (container − image), so a wider image spends proportionally more of its
+     * travel off-frame: at 300% the highlight only touched the glyphs for
+     * ~260ms of the sweep, which read as a flicker. At 200% it is on them for
+     * roughly half the sweep.
+     */
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: glass-word-shine 8s ease-in-out infinite;
+  }
+
+  /*
+   * The sweep occupies the first ~26% of the cycle; the rest is a hold. Both
+   * ends park the band fully off the glyphs, so the jump back at the loop
+   * boundary is invisible and the word spends most of its time perfectly still
+   * — which is what separates "expensive" from "busy".
+   */
+  @keyframes glass-word-shine {
+    0% {
+      background-position: 140% 0;
+    }
+    26% {
+      background-position: -40% 0;
+    }
+    100% {
+      background-position: -40% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .glass-word-shine {
+      animation: none;
+      opacity: 0;
+    }
+  }
+
+  /*
+   * Slim, themed scrollbar for surfaces where the bar is the only signal that
+   * there is more content — the prompt field past its height cap, for one.
+   *
+   * Both syntaxes on purpose: the standard properties cover Firefox and
+   * current Chrome, the `::-webkit-` rules cover older Chromium and, more
+   * usefully, force a persistent bar where the platform would otherwise use an
+   * overlay one that only appears mid-scroll.
+   */
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: color-mix(in oklab, var(--foreground) 25%, transparent);
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--foreground) 40%, transparent);
+  }
+
+  /*
+   * Firefox only. Setting `scrollbar-width` in Chromium makes it drop the
+   * `::-webkit-` rules above and fall back to a platform overlay bar — which
+   * paints nothing until you are already scrolling, and so cannot signal that
+   * there is more text. Firefox has no ::-webkit-scrollbar, so this is the
+   * cleanest way to hand each engine the syntax it honours.
+   */
+  @supports not selector(::-webkit-scrollbar) {
+    .scrollbar-slim {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in oklab, var(--foreground) 25%, transparent) transparent;
+    }
+  }
+
+  /* Typewriter cursor. `steps(1)` so it snaps on and off like a real caret
+     rather than pulsing. Nothing renders it once the line is complete, so it
+     needs no reduced-motion branch of its own. */
+  @keyframes caret-blink {
+    0%,
+    45% {
+      opacity: 1;
+    }
+    55%,
+    100% {
+      opacity: 0;
+    }
+  }
+  .caret-blink {
+    animation: caret-blink 1.05s steps(1) infinite;
+  }
+
+  /*
+   * Indeterminate work: a highlight sweeping across a surface, and a bar
+   * travelling across a track. Both say "running" without implying a
+   * percentage, which is the honest signal when nothing reports progress.
+   */
+  @keyframes sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+  .animate-sweep {
+    animation: sweep 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  .animate-track {
+    animation: sweep 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+
+  /* Typing indicator. Each dot carries its own delay inline. */
+  @keyframes typing-dot {
+    0%,
+    60%,
+    100% {
+      opacity: 0.25;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+  .animate-typing-dot {
+    animation: typing-dot 1.3s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-sweep,
+    .animate-track,
+    .animate-typing-dot {
+      animation: none;
+    }
+  }
+
+  /* Card rails scroll horizontally; the arrow controls are the affordance, so
+     the native bar would just add visual noise under every row. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * The theatre photograph behind the brief card.
+   *
+   * Two theme-dependent things, not one. Opacity is the obvious half; the blend
+   * mode is the half that actually makes it work:
+   *
+   * - Dark: `screen` keeps only what is *lighter* than the card, so the spotlight
+   *   and the gilt edges glow through and the photograph's near-black background
+   *   contributes nothing. Straight alpha would instead lay a grey film over the
+   *   whole card, muddying it rather than lighting it.
+   * - Light: `multiply` keeps only what is *darker*, so the beam reads as a faint
+   *   warm shadow. Screen on a white card is invisible; plain alpha is a smudge.
+   *
+   * Masked away from the bottom edge because the settings pills and the prose sit
+   * there and a photograph under small text costs legibility for nothing.
+   */
+  .brief-texture {
+    background-image: url("/assets/textures/theatre-spotlight.webp");
+    background-position: center 35%;
+    background-size: cover;
+    background-repeat: no-repeat;
+    opacity: var(--brief-texture-opacity);
+    mix-blend-mode: multiply;
+    mask-image: linear-gradient(to bottom, black 0%, black 30%, transparent 85%);
+  }
+
+  .dark .brief-texture {
+    mix-blend-mode: screen;
+  }
+
+  /*
+   * Frame used by the composer: translucent plate, bevel, refracted glow.
+   *
+   * Do NOT hand-write `-webkit-backdrop-filter` alongside the standard property.
+   * Lightning CSS treats the pair as one declaration and emitted *only* the
+   * prefixed form, which left `backdrop-filter: none` computed everywhere — the
+   * frosted blur silently did nothing. Prefixing is the build's job; it adds the
+   * `-webkit-` form from the browserslist targets on its own.
+   */
+  .glass-frame {
+    background-color: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(40px) saturate(150%);
   }
 }

@@ -6,8 +6,11 @@ import { siteConfig } from "@/config/site";
 
 import "./globals.css";
 
+// globals.css maps Tailwind's `font-sans` to `var(--font-sans)`, so the font
+// has to publish itself under exactly that name or every surface silently
+// falls back to the browser's serif.
 const geistSans = Geist({
-  variable: "--font-geist-sans",
+  variable: "--font-sans",
   subsets: ["latin"],
   display: "swap",
 });

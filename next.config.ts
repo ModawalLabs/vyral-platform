@@ -41,7 +41,23 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    formats: ["image/avif", "image/webp"],
+    /*
+     * AVIF in production only.
+     *
+     * The dev server's optimiser hangs indefinitely on an AVIF request: with the
+     * browser's `Accept: image/avif,image/webp,...` the response never arrives,
+     * while the same URL under `Accept: image/webp` answers in ~13ms. The result is
+     * that every `next/image` in the app renders blank under `npm run dev` —
+     * `complete: false`, `naturalWidth: 0`, request sent and never answered.
+     *
+     * `next start` on the same build encodes AVIF fine (~80ms), so this is a dev
+     * pipeline problem, not a config error. Dropping AVIF from the dev list keeps
+     * local images visible and leaves production output unchanged.
+     */
+    formats:
+      process.env.NODE_ENV === "development"
+        ? ["image/webp"]
+        : ["image/avif", "image/webp"],
     // Add remote CDN/storage hostnames here as they are introduced.
     remotePatterns: [],
   },

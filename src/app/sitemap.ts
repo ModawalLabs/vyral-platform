@@ -9,7 +9,8 @@ import { siteConfig } from "@/config/site";
  * 50,000 URLs.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const publicRoutes = [routes.home, routes.pricing];
+  // The workspace itself sits behind auth, so only the entry points are listed.
+  const publicRoutes = [routes.home, routes.signIn, routes.signUp];
 
   return publicRoutes.map((route) => ({
     url: `${siteConfig.url}${route === "/" ? "" : route}`,
