@@ -69,6 +69,18 @@ type SessionValue = {
   scenesGenerated: boolean;
   generateScenes: () => void;
 
+  /**
+   * Whether the final render has been asked for, which is what puts the final
+   * production card above the conversation.
+   *
+   * Session state for the same reason as `scenesGenerated`, and more so: the button
+   * that sets it lives in the brief tab, which unmounts on a tab switch, while the
+   * card it reveals lives in the director column, which does not. Nothing local to
+   * either could join those two up.
+   */
+  finalProductionStarted: boolean;
+  startFinalProduction: () => void;
+
   /** Tracks carry the history; `scenes` is the active version of each. */
   tracks: SceneTrack[];
   scenes: Scene[];
@@ -220,6 +232,15 @@ export function SessionProvider({
     setScenesGenerated(true);
     say(
       "Scenes are generated. The test screening below has a take per scene — switch between them to compare cuts before the final render.",
+    );
+  }, [say]);
+
+  const [finalProductionStarted, setFinalProductionStarted] = useState(false);
+
+  const startFinalProduction = useCallback(() => {
+    setFinalProductionStarted(true);
+    say(
+      "Final production is under way. It will appear at the top of this column when it is ready.",
     );
   }, [say]);
 
@@ -539,6 +560,8 @@ export function SessionProvider({
       activateStoryVersion,
       scenesGenerated,
       generateScenes,
+      finalProductionStarted,
+      startFinalProduction,
       tracks,
       scenes,
       updateScene,
@@ -567,6 +590,8 @@ export function SessionProvider({
       activateStoryVersion,
       scenesGenerated,
       generateScenes,
+      finalProductionStarted,
+      startFinalProduction,
       tracks,
       scenes,
       updateScene,

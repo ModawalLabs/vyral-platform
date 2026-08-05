@@ -822,6 +822,53 @@ test("workspace tabs drive one shared session", async ({ page }) => {
   await expect(second).toContainText("v3/3");
   await expect(second.getByRole("button", { name: /Next take/ })).toBeDisabled();
 
+  /*
+   * Generate Final Production splits the director column 30/70.
+   *
+   * The flag lives in the session, which is the only place that can join these two up:
+   * the button is in this tab panel, which unmounts on a tab switch, while the card it
+   * reveals is in the director column, which does not.
+   */
+  const split = page.locator("[data-slot=director-split]");
+  const productionCard = page.locator("[data-slot=final-production]");
+  await expect(split).toHaveCount(0);
+  await expect(productionCard).toHaveCount(0);
+
+  await panel.getByRole("button", { name: "Generate Final Production" }).click();
+  await expect(productionCard).toBeVisible();
+  await expect(chat.getByText(/final production is under way/i)).toBeVisible();
+
+  const ratio = await split.evaluate((el) => {
+    const [top, bottom] = [...el.children];
+    const total = el.getBoundingClientRect().height;
+    return {
+      top: +((top.getBoundingClientRect().height / total) * 100).toFixed(1),
+      bottom: +((bottom.getBoundingClientRect().height / total) * 100).toFixed(1),
+    };
+  });
+  // Exact, not approximate: a `gap` on the container would come off both panes and
+  // land this at 29.6/69, so the spacing lives inside the top pane instead.
+  expect(ratio.top).toBe(30);
+  expect(ratio.bottom).toBe(70);
+
+  // The chat keeps its composer clearance inside the smaller pane.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const reserve = document.querySelector("[data-slot=composer-reserve]")!;
+        const scroller = reserve.previousElementSibling!;
+        const composer = document.querySelector("[data-slot=composer-travel]")!;
+        return Math.round(
+          composer.getBoundingClientRect().top - scroller.getBoundingClientRect().bottom,
+        );
+      }),
+    )
+    .toBeGreaterThan(0);
+
+  // ...and the card survives leaving the tab that launched it.
+  await page.getByRole("tab", { name: "Asset Library" }).click();
+  await expect(productionCard).toBeVisible();
+
   // The Asset Library is deliberately empty — its UI is being rebuilt.
   await page.getByRole("tab", { name: "Asset Library" }).click();
   await expect(page.getByRole("tab", { name: "Asset Library" })).toHaveAttribute(

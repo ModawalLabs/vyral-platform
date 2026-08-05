@@ -24,7 +24,7 @@ const takeCount = (index: number) => 2 + (index % 3);
  * next to the scene tracks it is choosing between.
  */
 export function TestScreening() {
-  const { tracks, settings } = useSession();
+  const { tracks, settings, startFinalProduction } = useSession();
   const aspect = ASPECT_CLASS[settings.aspectRatio];
 
   return (
@@ -95,8 +95,9 @@ export function TestScreening() {
         </div>
       </div>
 
-      {/* TODO: no handler yet — the final-render API call belongs here. */}
-      <BrandButton className="h-11 w-full justify-center">
+      {/* TODO: the final-render API call belongs behind this; for now it only flips
+          the flag that splits the director column and reveals the production card. */}
+      <BrandButton className="h-11 w-full justify-center" onClick={startFinalProduction}>
         <Sparkles aria-hidden className="size-4" />
         Generate Final Production
       </BrandButton>

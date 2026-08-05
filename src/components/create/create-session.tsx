@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { DirectorPanel } from "@/components/create/director-panel";
+import { DirectorColumn } from "@/components/create/director-column";
 import { SessionProvider } from "@/components/create/session-provider";
 import { WorkspacePanel } from "@/components/create/workspace-panel";
 import { useComposer } from "@/components/home/composer-provider";
@@ -152,10 +152,7 @@ export function CreateSession({ handoff }: { handoff?: Handoff }) {
             }}
           >
             <section className="flex w-[38%] min-w-0 flex-col px-6">
-              <h2 className="pt-6 text-sm font-semibold tracking-wide uppercase">
-                AI Director
-              </h2>
-              <DirectorPanel />
+              <DirectorColumn />
             </section>
 
             {/* Divider draws itself down the middle as the columns arrive. */}

@@ -457,6 +457,48 @@
     animation: sweep 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   }
 
+  /*
+   * The final production card while it renders.
+   *
+   * Two bands on the same `sweep` track at different speeds, so they drift apart and
+   * back together instead of reading as one bar on a loop — that phase difference is
+   * what makes it feel considered rather than like a progress stripe. The eased curve
+   * is symmetric, so neither band snaps at the turn.
+   *
+   * The pair is deliberate: `--glass-sheen` is light in both themes, while the second
+   * band is `--foreground` at low alpha and therefore flips — dark over light, light
+   * over dark. Together they read as highlight-and-shadow either way round, which one
+   * fixed colour cannot do.
+   */
+  .animate-render-sheen {
+    animation: sweep 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .animate-render-shadow {
+    animation: sweep 3.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+
+  /*
+   * Each render step as it takes over from the last.
+   *
+   * Rises and settles rather than just fading: the small upward travel reads as one
+   * line replacing another, where a plain cross-fade reads as text flickering. It runs
+   * once per phrase — the loop lives in the component, which swaps the element's `key`
+   * and so restarts this from the top.
+   */
+  @keyframes phrase-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.375rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-phrase-in {
+    animation: phrase-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   /* Typing indicator. Each dot carries its own delay inline. */
   @keyframes typing-dot {
     0%,
@@ -477,8 +519,16 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-sweep,
     .animate-track,
-    .animate-typing-dot {
+    .animate-typing-dot,
+    .animate-render-sheen,
+    .animate-render-shadow {
       animation: none;
+    }
+    /* The phrases still change; they just arrive rather than travel. `both` on the
+       shorthand would otherwise leave them stuck at the keyframe's 0 opacity. */
+    .animate-phrase-in {
+      animation: none;
+      opacity: 1;
     }
   }
 
