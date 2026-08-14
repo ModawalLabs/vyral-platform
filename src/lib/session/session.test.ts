@@ -7,6 +7,7 @@ import { nextProgress } from "@/lib/session/render";
 import {
   durationState,
   initialScenes,
+  initialTracks,
   regenerateScene,
   reorder,
   totalDuration,
@@ -90,6 +91,33 @@ describe("regenerateScene", () => {
     const once = regenerateScene(hook);
     const twice = regenerateScene(once);
     expect(twice.visual).not.toBe(once.visual);
+  });
+});
+
+describe("initialTracks", () => {
+  /*
+   * The consequence of `Scene.id` identifying the scene rather than the take: every
+   * version of a track carries the same id, so a version list keyed on it collides.
+   *
+   * Asserted here and not only on `regenerateScene` because this is the shape the UI
+   * actually renders, and rendering it with `key={version.id}` is exactly the mistake
+   * this locks down.
+   */
+  it("gives every take of a track the same scene id", () => {
+    for (const track of initialTracks()) {
+      const ids = new Set(track.versions.map((version) => version.id));
+      expect(track.versions.length).toBeGreaterThan(1);
+      expect([...ids]).toEqual([track.id]);
+    }
+  });
+
+  it("seeds media on the track, so it survives a take switch", () => {
+    for (const track of initialTracks()) {
+      expect(track.media).toHaveLength(2);
+      // Ids, not bare urls: the same art can be attached twice and still be
+      // removed one tile at a time.
+      expect(new Set(track.media.map((item) => item.id)).size).toBe(2);
+    }
   });
 });
 

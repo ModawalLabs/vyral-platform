@@ -766,6 +766,10 @@ test("workspace tabs drive one shared session", async ({ page }) => {
   await expect(screeningHeading).toHaveCount(0);
   await expect(panel.locator("[data-slot=screening-preview]")).toHaveCount(0);
 
+  // Nor is there a scene picker on the composer yet — there is nothing to list.
+  const scenePill = page.getByRole("button", { name: /^Scenes/ });
+  await expect(scenePill).toHaveCount(0);
+
   // Clicking it reveals the section, and the director says so.
   await generateScenes.click();
   await expect(screeningHeading).toBeVisible();
@@ -823,6 +827,122 @@ test("workspace tabs drive one shared session", async ({ page }) => {
   await expect(second.getByRole("button", { name: /Next take/ })).toBeDisabled();
 
   /*
+   * Generating scenes also puts the scene picker on the composer.
+   *
+   * It has to sit on top of the chat box without being overlapped by it, which is why
+   * it is in flow above the measured composer reserve rather than positioned over the
+   * composer: the reserve grows with the field, so the pill is pushed up with it.
+   */
+  await expect(scenePill).toBeVisible();
+  const pillBox = await scenePill.boundingBox();
+  const composerBox = await page.locator("[data-slot=composer-travel]").boundingBox();
+  expect(pillBox!.y + pillBox!.height).toBeLessThan(composerBox!.y);
+  // Flush with the composer's left edge — the column's padding is the same 1.5rem.
+  expect(Math.round(pillBox!.x)).toBe(Math.round(composerBox!.x));
+
+  // Opens upward, because the composer is pinned to the bottom of the screen.
+  await scenePill.click();
+  const sceneRows = page.locator("[data-slot=scene-picker-list] [role=checkbox]");
+  await expect(sceneRows).toHaveCount(5);
+  // Polled, not sampled: the panel enters on `slide-in-from-bottom-2`, whose 8px offset
+  // exactly cancels the 8px `sideOffset`, so a single read mid-flight finds it sitting
+  // on the pill it will clear once the animation settles.
+  await expect
+    .poll(async () => {
+      const box = (await page.locator("[data-slot=popover-content]").boundingBox())!;
+      return Math.round(box.y + box.height);
+    })
+    .toBeLessThan(Math.round(pillBox!.y));
+
+  // Every row names its beat and carries the scene's own length.
+  await expect(sceneRows.nth(0)).toContainText("Hook");
+  await expect(sceneRows.nth(2)).toContainText("3s");
+
+  // Multiple at once: ticking a second row leaves the first ticked, and the pill
+  // carries the count while its accessible name stays "Scenes".
+  await sceneRows.nth(0).click();
+  await sceneRows.nth(2).click();
+  await expect(sceneRows.nth(0)).toHaveAttribute("aria-checked", "true");
+  await expect(sceneRows.nth(2)).toHaveAttribute("aria-checked", "true");
+  await expect(sceneRows.nth(1)).toHaveAttribute("aria-checked", "false");
+  await expect(scenePill).toContainText("2");
+
+  await page.getByRole("button", { name: "Select all" }).click();
+  await expect(scenePill).toContainText("5");
+  await page.getByRole("button", { name: "Clear" }).click();
+  await expect(sceneRows.nth(0)).toHaveAttribute("aria-checked", "false");
+
+  /*
+   * A selected scene writes a live card into the foot of the conversation.
+   *
+   * Live rather than posted: it tracks the current selection instead of appending a
+   * message per tick, so it leaves again when the selection is emptied.
+   */
+  const sceneCards = page.locator("[data-slot=selected-scene]");
+  await expect(sceneCards).toHaveCount(0);
+
+  await sceneRows.nth(0).click();
+  await sceneRows.nth(2).click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-slot=popover-content]")).toHaveCount(0);
+
+  await expect(sceneCards).toHaveCount(2);
+  await expect(chat.getByText("2 scenes selected")).toBeVisible();
+  // The cards hand back to the composer rather than ending the exchange.
+  await expect(chat.getByText("What would you like to edit?")).toBeVisible();
+  // Numbered by position in the cut, not in the selection.
+  await expect(sceneCards.nth(1)).toHaveAttribute("aria-label", "Scene 3, Solution");
+  // In the conversation itself, not in a panel beside it.
+  expect(
+    await page.evaluate(() =>
+      document
+        .querySelector("[data-slot=chat-scroller]")!
+        .contains(document.querySelector("[data-slot=selected-scene]")),
+    ),
+  ).toBe(true);
+
+  /*
+   * The version buttons drive the same active take the Screenplay tab does, so the
+   * card's own duration follows — which is what proves it is switching the take and
+   * not just painting a button.
+   */
+  const hookCard = sceneCards.first();
+  await expect(hookCard).toContainText("2s");
+  await hookCard.getByRole("button", { name: "Take 2 of scene 1" }).click();
+  await expect(
+    hookCard.getByRole("button", { name: "Take 2 of scene 1" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(hookCard).toContainText("1s");
+
+  // Media is real session state: adding and removing here changes the Screenplay
+  // tab's row for the same beat, which used to derive its stills and could not.
+  const hookMedia = hookCard.locator("[data-slot=selected-scene-media] img");
+  await expect(hookMedia).toHaveCount(2);
+  await hookCard.getByRole("button", { name: "Add media to scene 1" }).click();
+  await expect(hookMedia).toHaveCount(3);
+  await expect(
+    panel.locator("[data-slot=scene-media]").first().locator("img"),
+  ).toHaveCount(3);
+
+  await hookCard.getByRole("button", { name: "Remove reference 1 from scene 1" }).click();
+  await expect(hookMedia).toHaveCount(2);
+  await expect(
+    panel.locator("[data-slot=scene-media]").first().locator("img"),
+  ).toHaveCount(2);
+
+  // The selection is session state, so it outlives the panel that set it.
+  await page.getByRole("tab", { name: "Asset Library" }).click();
+  await page.getByRole("tab", { name: "Production Workspace" }).click();
+  await expect(sceneCards).toHaveCount(2);
+
+  // Emptying the selection takes the cards with it.
+  await scenePill.click();
+  await page.getByRole("button", { name: "Select all" }).click();
+  await page.getByRole("button", { name: "Clear" }).click();
+  await page.keyboard.press("Escape");
+  await expect(sceneCards).toHaveCount(0);
+
+  /*
    * Generate Final Production splits the director column 30/70.
    *
    * The flag lives in the session, which is the only place that can join these two up:
@@ -855,8 +975,10 @@ test("workspace tabs drive one shared session", async ({ page }) => {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const reserve = document.querySelector("[data-slot=composer-reserve]")!;
-        const scroller = reserve.previousElementSibling!;
+        // Named, not `reserve.previousElementSibling` — the scene picker now sits
+        // between the two, so a sibling walk would measure the pill and pass on a
+        // clearance it never checked.
+        const scroller = document.querySelector("[data-slot=chat-scroller]")!;
         const composer = document.querySelector("[data-slot=composer-travel]")!;
         return Math.round(
           composer.getBoundingClientRect().top - scroller.getBoundingClientRect().bottom,

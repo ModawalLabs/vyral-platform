@@ -85,7 +85,6 @@ export function ScreenplayTab() {
         >
           <ScenePanel
             track={track}
-            index={index}
             prevBeat={tracks[index - 1]?.beat}
             nextBeat={tracks[index + 1]?.beat}
             aspectClass={ASPECT_CLASS[settings.aspectRatio]}

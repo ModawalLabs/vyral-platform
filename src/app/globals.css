@@ -50,6 +50,11 @@
   --color-stale: var(--stale);
   --color-glass: var(--glass);
   --color-glass-border: var(--glass-border);
+  /* Was missing, so every `via-glass-sheen` / `from-glass-sheen` in the app resolved to
+     no utility at all and emitted nothing — the composer's specular bevel and falling
+     sheen had never rendered. The variable existed the whole time; only this line was
+     absent. Verified against the built stylesheet, not by eye. */
+  --color-glass-sheen: var(--glass-sheen);
   --color-composer: var(--composer);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);

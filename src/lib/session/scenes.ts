@@ -1,8 +1,24 @@
-import { BEATS, type Beat, type Scene, type SceneTrack } from "@/types/session";
+import { placeholderFor } from "@/lib/session/assets";
+import {
+  BEATS,
+  type Beat,
+  type Scene,
+  type SceneMedia,
+  type SceneTrack,
+} from "@/types/session";
 
 let sceneCounter = 0;
 /** Monotonic rather than random, so ids stay stable under React's strict double-invoke. */
 export const nextSceneId = () => `sc_${(sceneCounter += 1)}`;
+
+let mediaCounter = 0;
+const nextMediaId = () => `md_${(mediaCounter += 1)}`;
+
+/** Wrap placeholder art as an attachable tile. The only way media is minted. */
+export const makeSceneMedia = (index: number): SceneMedia => ({
+  id: nextMediaId(),
+  url: placeholderFor(index),
+});
 
 const BEAT_SEEDS: Record<Beat, Omit<Scene, "id" | "beat">> = {
   Hook: {
@@ -98,13 +114,17 @@ export function initialScenes(): Scene[] {
  * it stays in step with the seeds above and is visibly a different take instead of
  * a reworded one. Take 1 stays active — it is the seed the rest of the mock copy
  * was written against.
+ *
+ * The two seeded stills per beat are the pair the Screenplay tab used to derive from
+ * the scene's position. They are state now, so they can be added to and removed.
  */
 export function initialTracks(): SceneTrack[] {
-  return initialScenes().map((scene) => ({
+  return initialScenes().map((scene, index) => ({
     id: scene.id,
     beat: scene.beat,
     versions: [scene, regenerateScene(scene)],
     activeIndex: 0,
+    media: [makeSceneMedia(index), makeSceneMedia(index + 1)],
   }));
 }
 

@@ -98,12 +98,12 @@ export function PromptComposer({
         {/* Sheen falling from the top edge gives the slab thickness */}
         <div
           aria-hidden
-          className="from-glass-sheen/40 pointer-events-none absolute inset-0 bg-gradient-to-b via-transparent to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-glass-sheen/40 via-transparent to-transparent"
         />
         {/* Specular highlight along the top bevel */}
         <div
           aria-hidden
-          className="via-glass-sheen pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-glass-sheen to-transparent"
         />
         {/* Refracted glow pooling in the lower corner */}
         <div
