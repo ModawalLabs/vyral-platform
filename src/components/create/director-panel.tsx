@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { ScenePicker } from "@/components/create/scene-picker";
+import { SelectedScenes } from "@/components/create/selected-scenes";
 import { useSession } from "@/components/create/session-provider";
 import { cn } from "@/lib/utils";
 
@@ -13,14 +15,18 @@ import { cn } from "@/lib/utils";
  * only reads; the messages are composed where the action happens.
  */
 export function DirectorPanel() {
-  const { messages } = useSession();
+  const { messages, scenesGenerated, selectedSceneIds } = useSession();
   const endRef = useRef<HTMLDivElement>(null);
 
   // Follow the conversation as it grows. `smooth` on a list that appends every
   // few seconds would still be animating when the next line arrives.
+  //
+  // The selection counts as growth: its cards render at the foot of the scroller, so
+  // ticking a scene while the chat is already full would otherwise put them just out
+  // of sight below the fold.
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+  }, [messages.length, selectedSceneIds]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -37,7 +43,10 @@ export function DirectorPanel() {
         Ending the viewport early fixes both at once: nothing can be behind the
         composer because the scrollable area stops before it.
       */}
-      <div className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto pt-6 pr-1">
+      <div
+        data-slot="chat-scroller"
+        className="scrollbar-slim min-h-0 flex-1 space-y-4 overflow-y-auto pt-6 pr-1"
+      >
         {messages.map((message) => (
           <div
             key={message.id}
@@ -65,8 +74,30 @@ export function DirectorPanel() {
             </p>
           </div>
         ))}
+
+        {/* After the messages, not among them: the selection is current state rather
+            than something that was said, so it stays at the foot of the conversation
+            instead of being stranded at whatever point it was ticked. */}
+        <SelectedScenes />
+
         <div ref={endRef} />
       </div>
+
+      {/*
+        Sits directly on top of the composer, in flow rather than positioned over it.
+
+        The reserve below is measured from the composer, so as the field grows the
+        reserve grows and this is pushed up with it — the pill can never be overlapped
+        by the box it belongs to. `pt-3` separates it from the last message; the gap
+        below it is the reserve's own 0.75rem, so no padding is needed on that side.
+
+        Gated on `scenesGenerated` because before that there is nothing to list.
+      */}
+      {scenesGenerated ? (
+        <div className="shrink-0 pt-3">
+          <ScenePicker />
+        </div>
+      ) : null}
 
       {/*
         The composer's footprint, as real layout rather than padding.

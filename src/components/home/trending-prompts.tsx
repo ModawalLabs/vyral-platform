@@ -60,7 +60,7 @@ export function TrendingPrompts() {
           {/* Specular bevel along the top edge — the tell that sells glass. */}
           <span
             aria-hidden
-            className="via-glass-sheen absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent"
+            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-glass-sheen to-transparent"
           />
           {/* Brand light pooling in from the corner, warmed on hover. */}
           <span

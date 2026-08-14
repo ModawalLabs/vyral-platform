@@ -67,6 +67,14 @@ export type Beat = (typeof BEATS)[number];
  * expanded card edits.
  */
 export type Scene = {
+  /**
+   * The *scene's* identity, not the take's — every version in a `SceneTrack` carries
+   * the same one, and it matches the track's own id.
+   *
+   * Deliberate: render jobs and retries key off it, so switching take must not change
+   * what a scene is called. The consequence is that a list of versions cannot be keyed
+   * by this — use the position instead.
+   */
   id: string;
   beat: Beat;
   durationSeconds: number;
@@ -77,6 +85,13 @@ export type Scene = {
   dialogue: string;
   sound: string;
   transition: string;
+};
+
+/** A reference still attached to a beat. Carries an id so two copies of the same
+    art are still two removable tiles. */
+export type SceneMedia = {
+  id: string;
+  url: string;
 };
 
 /**
@@ -91,6 +106,15 @@ export type SceneTrack = {
   beat: Beat;
   versions: Scene[];
   activeIndex: number;
+  /**
+   * Attached reference art, on the track rather than on a version.
+   *
+   * A version is a take on the *script* — a different camera move, a different
+   * duration. Reference you attached to the beat is not part of that, so hanging it
+   * off `versions[activeIndex]` would make it vanish the moment you compared two
+   * takes and come back changed.
+   */
+  media: SceneMedia[];
 };
 
 export const ASSET_KINDS = [

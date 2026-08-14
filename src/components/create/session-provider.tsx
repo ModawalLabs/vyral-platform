@@ -25,6 +25,7 @@ import {
 import {
   activeScene,
   initialTracks,
+  makeSceneMedia,
   nextSceneId,
   pushVersion,
   regenerateScene,
@@ -84,6 +85,22 @@ type SessionValue = {
   /** Tracks carry the history; `scenes` is the active version of each. */
   tracks: SceneTrack[];
   scenes: Scene[];
+
+  /**
+   * Which scenes the composer's picker has selected, by track id.
+   *
+   * Session state because two separate places in the director column read it: the
+   * pill above the composer, and the detail cards at the end of the conversation.
+   * Neither owns the other, so neither can own the selection.
+   */
+  selectedSceneIds: ReadonlySet<string>;
+  toggleSceneSelected: (trackId: string) => void;
+  setSelectedScenes: (trackIds: string[]) => void;
+
+  /** Attach or drop a reference still. Both act on the track, not the active take. */
+  addSceneMedia: (trackId: string) => void;
+  removeSceneMedia: (trackId: string, mediaId: string) => void;
+
   updateScene: (id: string, patch: Partial<Scene>) => void;
   duplicateScene: (id: string) => void;
   deleteScene: (id: string) => void;
@@ -280,6 +297,9 @@ export function SessionProvider({
         beat: source.beat,
         versions: [{ ...source, id: copyId }],
         activeIndex: 0,
+        // Same attachments, not the same array — a copy that shared it would
+        // delete out of both tracks at once.
+        media: [...current[index].media],
       };
 
       const next = [...current];
@@ -327,6 +347,58 @@ export function SessionProvider({
 
   /** What every other tab and the renderer read. */
   const scenes = useMemo(() => tracks.map(activeScene), [tracks]);
+
+  /* ------------------------------------------------- scene selection and media */
+
+  const [selectedSceneIds, setSelectedSceneIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+
+  const toggleSceneSelected = useCallback((trackId: string) => {
+    setSelectedSceneIds((current) => {
+      const next = new Set(current);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  }, []);
+
+  const setSelectedScenes = useCallback((trackIds: string[]) => {
+    setSelectedSceneIds(new Set(trackIds));
+  }, []);
+
+  /**
+   * Attach another reference still.
+   *
+   * The index walks the placeholder set by how much is already attached, so a beat
+   * with two stills gets a third that is visibly different rather than a repeat of
+   * what is already there. Ids make duplicates removable individually anyway, once
+   * the set wraps.
+   *
+   * TODO: takes whatever the Asset Library hands over, once it can hand one over.
+   */
+  const addSceneMedia = useCallback((trackId: string) => {
+    setTracks((current) =>
+      current.map((track, index) =>
+        track.id === trackId
+          ? {
+              ...track,
+              media: [...track.media, makeSceneMedia(index + track.media.length)],
+            }
+          : track,
+      ),
+    );
+  }, []);
+
+  const removeSceneMedia = useCallback((trackId: string, mediaId: string) => {
+    setTracks((current) =>
+      current.map((track) =>
+        track.id === trackId
+          ? { ...track, media: track.media.filter((item) => item.id !== mediaId) }
+          : track,
+      ),
+    );
+  }, []);
 
   /* ------------------------------------------------------------------ assets */
 
@@ -570,6 +642,11 @@ export function SessionProvider({
       regenerateOneScene,
       moveScene,
       activateSceneVersion,
+      selectedSceneIds,
+      toggleSceneSelected,
+      setSelectedScenes,
+      addSceneMedia,
+      removeSceneMedia,
       assets,
       generateAsset,
       uploadAsset,
@@ -600,6 +677,11 @@ export function SessionProvider({
       regenerateOneScene,
       moveScene,
       activateSceneVersion,
+      selectedSceneIds,
+      toggleSceneSelected,
+      setSelectedScenes,
+      addSceneMedia,
+      removeSceneMedia,
       assets,
       generateAsset,
       uploadAsset,

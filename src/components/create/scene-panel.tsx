@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, ImagePlus } from "lucide-react";
+import { ArrowLeft, ArrowRight, ImagePlus, X } from "lucide-react";
 import Image from "next/image";
 
+import { useSession } from "@/components/create/session-provider";
 import { VersionList } from "@/components/create/version-list";
-import { placeholderFor } from "@/lib/session/assets";
 import { activeScene } from "@/lib/session/scenes";
 import type { SceneTrack } from "@/types/session";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,6 @@ const FIELDS = [
  */
 export function ScenePanel({
   track,
-  index,
   prevBeat,
   nextBeat,
   aspectClass,
@@ -38,7 +37,6 @@ export function ScenePanel({
   onActivateVersion,
 }: {
   track: SceneTrack;
-  index: number;
   /** The beats either side, for the step buttons' labels. Absent at the ends. */
   prevBeat?: string;
   nextBeat?: string;
@@ -128,7 +126,7 @@ export function ScenePanel({
           ))}
         </dl>
 
-        <SceneMedia beat={track.beat} index={index} aspectClass={aspectClass} />
+        <SceneMedia track={track} aspectClass={aspectClass} />
       </div>
     </div>
   );
@@ -137,22 +135,17 @@ export function ScenePanel({
 /**
  * The media attached to this scene, on its own row under the script.
  *
- * Two stand-in stills plus a slot to add more. Scrolls horizontally rather than
- * wrapping, so the panel's height stays put as the aspect ratio changes and as tiles
- * are added — a row that reflowed would move everything below it.
+ * Reads the track's own `media`, which is state — the same list the composer's scene
+ * picker adds to and removes from, so the two surfaces cannot disagree about what is
+ * attached. It used to be derived from the scene's position, which looked identical
+ * and could not change.
+ *
+ * Scrolls horizontally rather than wrapping, so the panel's height stays put as the
+ * aspect ratio changes and as tiles are added — a row that reflowed would move
+ * everything below it.
  */
-function SceneMedia({
-  beat,
-  index,
-  aspectClass,
-}: {
-  beat: string;
-  index: number;
-  aspectClass: string;
-}) {
-  // Keyed off the scene's position, so each beat shows a different pair and keeps
-  // it across re-renders. Same placeholder art the Asset Library resolves to.
-  const stills = [placeholderFor(index), placeholderFor(index + 1)];
+function SceneMedia({ track, aspectClass }: { track: SceneTrack; aspectClass: string }) {
+  const { addSceneMedia, removeSceneMedia } = useSession();
 
   return (
     <section className="min-w-0">
@@ -166,8 +159,10 @@ function SceneMedia({
       >
         <button
           type="button"
-          // TODO: opens the media picker once the Asset Library can hand one over.
-          aria-label={`Add media to the ${beat}`}
+          onClick={() => addSceneMedia(track.id)}
+          // TODO: opens the Asset Library picker once it can hand one over; for now it
+          // attaches the next placeholder still.
+          aria-label={`Add media to the ${track.beat}`}
           className={cn(
             "grid w-24 shrink-0 place-items-center rounded-lg border border-dashed border-border/70 bg-muted/20 text-muted-foreground",
             "transition-colors hover:border-brand/50 hover:bg-brand/5 hover:text-foreground",
@@ -181,21 +176,40 @@ function SceneMedia({
           </span>
         </button>
 
-        {stills.map((src, index) => (
+        {track.media.map((item, index) => (
           <figure
-            key={src}
+            key={item.id}
             className={cn(
-              "relative w-24 shrink-0 overflow-hidden rounded-lg border border-border/60",
+              "group/tile relative w-24 shrink-0 overflow-hidden rounded-lg border border-border/60",
               aspectClass,
             )}
           >
             <Image
-              src={src}
-              alt={`${beat} reference ${index + 1}`}
+              src={item.url}
+              alt={`${track.beat} reference ${index + 1}`}
               fill
               sizes="96px"
               className="object-cover"
             />
+
+            {/* Revealed on hover but never removed from the DOM — `hidden` until
+                hover would put it out of the keyboard's reach, so focus reveals it
+                too. Paired with Add rather than left out: a row you can only ever
+                grow is a trap. */}
+            <button
+              type="button"
+              onClick={() => removeSceneMedia(track.id, item.id)}
+              aria-label={`Remove reference ${index + 1} from the ${track.beat}`}
+              title="Remove"
+              className={cn(
+                "absolute top-1 right-1 grid size-5 place-items-center rounded-md",
+                "bg-background/80 text-foreground opacity-0 backdrop-blur-sm transition-opacity",
+                "group-hover/tile:opacity-100 hover:bg-background focus-visible:opacity-100",
+                "focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none",
+              )}
+            >
+              <X aria-hidden className="size-3" />
+            </button>
           </figure>
         ))}
       </div>

@@ -2,6 +2,7 @@
 
 import { ChevronDown, Clock, Monitor, Share2, Sparkles } from "lucide-react";
 
+import { GLASS_SURFACE } from "@/components/create/glass";
 import {
   ASPECT_RATIOS,
   MAX_DURATION,
@@ -61,20 +62,8 @@ function Chevron() {
   );
 }
 
-/**
- * The frosted treatment, as utilities rather than the `.glass-frame` class.
- *
- * `.glass-frame` lives in `@layer components`, which loses to `@layer utilities` —
- * so on a pill that already carries `bg-foreground/[0.03]` from `PILL`, its
- * background and border never applied and the pill was not actually glass. Written
- * as utilities, tailwind-merge replaces `PILL`'s background and border cleanly and
- * the cascade has nothing left to argue about.
- */
-const GLASS = cn(
-  "border-glass-border bg-glass backdrop-blur-2xl backdrop-saturate-150",
-  // PILL's hover would otherwise swap the plate back out for a flat tint.
-  "hover:border-glass-border hover:bg-glass hover:brightness-110",
-);
+/** The frosted plate these pills sit on. See `GLASS_SURFACE` for why it is utilities. */
+const GLASS = GLASS_SURFACE;
 
 /**
  * The session's five settings as one row of glass pills.
