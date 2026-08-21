@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DirectorColumn } from "@/components/create/director-column";
 import { SessionProvider } from "@/components/create/session-provider";
-import { WorkspacePanel } from "@/components/create/workspace-panel";
+import { WorkspaceSide } from "@/components/create/workspace-side";
 import { useComposer } from "@/components/home/composer-provider";
 import {
   parseSettings,
@@ -167,9 +167,12 @@ export function CreateSession({ handoff }: { handoff?: Handoff }) {
             {/* No heading: the first tab is now called "Production Workspace", so a
                 heading above it would have said the same thing twice. `pt-2` plus
                 the panel's own `pt-4` lands the tab row on the same baseline as the
-                AI Director heading opposite. */}
+                AI Director heading opposite.
+
+                `WorkspaceSide` decides whether that is the workspace yet — until the
+                director's intake is answered it is the production slate instead. */}
             <section className="flex min-w-0 flex-1 flex-col px-6 pt-2">
-              <WorkspacePanel />
+              <WorkspaceSide />
             </section>
           </SessionProvider>
         ) : null}

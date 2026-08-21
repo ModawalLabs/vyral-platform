@@ -15,10 +15,20 @@ import { cn } from "@/lib/utils";
 export function HeroBackdrop({
   fadeDoodles = true,
   dimmed = false,
+  doodles = true,
 }: {
   fadeDoodles?: boolean;
   /** Pull the decoration back once there is real work on screen. */
   dimmed?: boolean;
+  /**
+   * Draw the film-kit doodle field.
+   *
+   * Off where something else is going to occupy the background — the sign-in screen is
+   * getting video behind it. The two brand washes stay either way: they are what gives
+   * the glass wordmark something with colour to refract, and they are tuned values that
+   * should not be copied into a second file just to drop the doodles.
+   */
+  doodles?: boolean;
 }) {
   return (
     <div
@@ -28,7 +38,7 @@ export function HeroBackdrop({
         dimmed && "opacity-35",
       )}
     >
-      <DoodleField fadeBottom={fadeDoodles} />
+      {doodles ? <DoodleField fadeBottom={fadeDoodles} /> : null}
 
       {/*
         The glass title has a translucent fill, so it needs something with

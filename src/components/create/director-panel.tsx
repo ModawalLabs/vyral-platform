@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 
 import { ScenePicker } from "@/components/create/scene-picker";
+import { DirectorTyping } from "@/components/create/director-typing";
+import { IntakeProceed } from "@/components/create/intake-proceed";
 import { SelectedScenes } from "@/components/create/selected-scenes";
 import { useSession } from "@/components/create/session-provider";
 import { cn } from "@/lib/utils";
@@ -15,7 +17,7 @@ import { cn } from "@/lib/utils";
  * only reads; the messages are composed where the action happens.
  */
 export function DirectorPanel() {
-  const { messages, scenesGenerated, selectedSceneIds } = useSession();
+  const { messages, scenesGenerated, selectedSceneIds, intakeTyping } = useSession();
   const endRef = useRef<HTMLDivElement>(null);
 
   // Follow the conversation as it grows. `smooth` on a list that appends every
@@ -26,7 +28,7 @@ export function DirectorPanel() {
   // of sight below the fold.
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, selectedSceneIds]);
+  }, [messages.length, selectedSceneIds, intakeTyping]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -75,9 +77,14 @@ export function DirectorPanel() {
           </div>
         ))}
 
-        {/* After the messages, not among them: the selection is current state rather
-            than something that was said, so it stays at the foot of the conversation
-            instead of being stranded at whatever point it was ticked. */}
+        {/* Both of these sit after the messages rather than among them, because both
+            belong to *now* rather than to the transcript: the indicator is the line
+            still being written, and Proceed answers the question at the bottom. */}
+        {intakeTyping ? <DirectorTyping /> : null}
+        <IntakeProceed />
+
+        {/* Current state, not something that was said — so it stays at the foot of the
+            conversation instead of being stranded at whatever point it was ticked. */}
         <SelectedScenes />
 
         <div ref={endRef} />

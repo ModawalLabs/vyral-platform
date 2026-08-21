@@ -1,4 +1,4 @@
-﻿import { expect, test, type Locator } from "@playwright/test";
+﻿import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
  * Click a trigger until its panel is actually open.
@@ -14,6 +14,26 @@ async function openPanel(trigger: Locator, revealed: Locator) {
   }).toPass({ timeout: 15_000 });
 }
 
+/**
+ * Answer the director's intake so the workspace opens.
+ *
+ * The right column is a production slate until both questions are proceeded past, so
+ * every test that touches a workspace tab has to get through this first. Each Proceed
+ * is followed by a pause while the next line is "typed", which is why this waits on the
+ * button reappearing rather than on a fixed delay.
+ */
+async function completeIntake(page: Page) {
+  const proceed = page.getByRole("button", { name: "Proceed" });
+  for (let i = 0; i < 2; i++) {
+    await expect(proceed).toBeVisible({ timeout: 10_000 });
+    await proceed.click();
+  }
+  // The tabs replace the slate on the beat the closing line lands.
+  await expect(page.getByRole("tab", { name: "Production Workspace" })).toBeVisible({
+    timeout: 10_000,
+  });
+}
+
 test("workspace home renders the composer and greets the user", async ({ page }) => {
   await page.goto("/");
 
@@ -24,6 +44,54 @@ test("workspace home renders the composer and greets the user", async ({ page })
     page.locator("p", { hasText: /ready to get creative\?/i }).first(),
   ).toBeVisible();
   await expect(page.getByLabel(/describe your vyral idea/i)).toBeVisible();
+});
+
+test("home keeps its spacing as the window gets shorter", async ({ page }) => {
+  /*
+   * The hero's height is viewport-derived but the space under the composer must not be.
+   *
+   * It used to be: `min-h-[56vh]` with centred content split the leftover height above
+   * and below, so the following section sat 97px under the composer on a tall window and
+   * 32px under it on a short one. The Trending block's own wash reached a fixed 128px
+   * above its section on top of that, so as the gap closed the wash climbed over the
+   * composer and drew a tinted edge across it.
+   */
+  await page.goto("/");
+
+  const measure = () =>
+    page.evaluate(() => {
+      const composer = document.querySelector("form .glass-frame")!;
+      const trending = [...document.querySelectorAll("h2")]
+        .find((n) => /trending/i.test(n.textContent ?? ""))!
+        .closest("section")!;
+      // The rails' backdrop wash — the thing that used to ride up over the composer.
+      // By slot, not by class: keying on `-top-16` would make this crash rather than
+      // fail if the offset were ever retuned, which is exactly the case it must catch.
+      const wash = document.querySelector("[data-slot=rails-wash]")!;
+      const bottom = composer.getBoundingClientRect().bottom;
+      return {
+        gap: Math.round(trending.getBoundingClientRect().top - bottom),
+        washClearance: Math.round(wash.getBoundingClientRect().top - bottom),
+      };
+    });
+
+  // Deliberately spans the collapse: 56vh stops winning somewhere around 780px, so
+  // these bracket both regimes — slack to distribute, and none.
+  const heights = [1200, 900, 800, 700, 500, 400];
+  const seen: Array<{ gap: number; washClearance: number }> = [];
+
+  for (const height of heights) {
+    await page.setViewportSize({ width: 1440, height });
+    // The greeting types itself in; wait for the composer to settle at its final y.
+    await expect.poll(async () => (await measure()).gap).toBeGreaterThan(0);
+    seen.push(await measure());
+  }
+
+  // One gap, at every height — not merely "positive".
+  expect(new Set(seen.map((s) => s.gap)).size).toBe(1);
+  // ...and the wash stays off the composer throughout.
+  for (const { washClearance } of seen) expect(washClearance).toBeGreaterThan(0);
+  expect(new Set(seen.map((s) => s.washClearance)).size).toBe(1);
 });
 
 test("greeting types itself in without moving the page", async ({ page }) => {
@@ -374,6 +442,8 @@ test("Generate on home hands the session to /new", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "AI Director" })).toBeVisible();
   await expect(page.getByText(prompt).first()).toBeVisible();
 
+  await completeIntake(page);
+
   // The carried settings reached the session. The brief is the only place they are
   // visible — and the only place they can be changed.
   await page.getByRole("tab", { name: "Production Workspace" }).click();
@@ -385,6 +455,9 @@ test("a hand-edited handoff URL cannot inject bad settings", async ({ page }) =>
   await page.goto("/new?prompt=Test%20prompt&model=GPT-9&duration=999&aspect=1%3A1");
 
   await expect(page.getByText("Test prompt").first()).toBeVisible();
+
+  // The settings live in the workspace, which the intake gates.
+  await completeIntake(page);
 
   // Unknown model and ratio fall back; the duration clamps to the slider's max.
   await page.getByRole("tab", { name: "Production Workspace" }).click();
@@ -413,8 +486,22 @@ test("Generate splits /new into director and workspace columns", async ({ page }
   await page.getByRole("button", { name: "Generate" }).click();
 
   await expect(page.getByRole("heading", { name: "AI Director" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Production Workspace" })).toBeVisible();
   await expect(page).toHaveURL(/\/new$/);
+
+  /*
+   * The right column starts as a production slate, not the workspace.
+   *
+   * Unmounted rather than hidden, so this asserts a count of zero: a hidden `Tabs`
+   * would still be focusable behind the slate, and `toBeHidden` passes for an element
+   * that is merely clipped by an overflow ancestor.
+   */
+  await expect(page.locator("[data-slot=intake-slate]")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Production Workspace" })).toHaveCount(0);
+  // The slate carries the brief it was handed, so both halves agree on the job.
+  await expect(page.locator("[data-slot=intake-slate]")).toContainText(prompt);
+
+  await completeIntake(page);
+  await expect(page.locator("[data-slot=intake-slate]")).toHaveCount(0);
 
   // The composer travelled rather than being re-created: same element, moved
   // left and narrowed into the left column.
@@ -519,6 +606,8 @@ test("workspace tabs drive one shared session", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Generate", exact: true })).toHaveCount(
     0,
   );
+
+  await completeIntake(page);
 
   // The brief: prose and settings on one page, read-only until Edit.
   await page.getByRole("tab", { name: "Production Workspace" }).click();
@@ -1010,6 +1099,7 @@ test("Escape closes a workspace popup before it closes the screen", async ({ pag
   // on this same route. Escape is bound to dismissing it, so a popup swallowing the
   // key first is the difference between closing a menu and losing the whole screen.
   await page.goto("/new?prompt=A%20neon-lit%20Tokyo%20alley");
+  await completeIntake(page);
   const brief = page.getByRole("tabpanel").first().locator("[data-slot=brief-card]");
   await brief.getByRole("button", { name: "Edit" }).click();
 
@@ -1136,6 +1226,86 @@ test("project cards expose edit, preview and download on hover", async ({ page }
   // overlay is transparent, and focusing one reveals the set.
   await ready.getByRole("button", { name: "Edit" }).focus();
   await expect(ready.getByRole("button", { name: "Edit" })).toBeFocused();
+});
+
+test("settings shows the profile, credits and every connection", async ({ page }) => {
+  await page.goto("/settings");
+
+  // Profile: identity from the shared placeholder, so this and the home greeting
+  // cannot disagree about who is signed in.
+  await expect(page.getByRole("heading", { name: "Shivansh Modawal" })).toBeVisible();
+  await expect(page.getByText("shivansh@i2ltech.com").first()).toBeVisible();
+  await expect(page.locator("[data-slot=plan-badge]")).toContainText("Studio");
+
+  // The four fields are a description list, so each label owns its value.
+  const fields = page.locator("dl div");
+  await expect(fields).toHaveCount(4);
+  for (const label of ["Display name", "Phone", "Email", "Member since"]) {
+    await expect(page.getByText(label, { exact: true })).toBeVisible();
+  }
+
+  // No photo exists yet, so the avatar must fall through to initials rather than
+  // rendering a broken image.
+  const avatar = page.locator("[data-slot=avatar]");
+  await expect(avatar).toContainText("SM");
+  await expect(avatar.locator("img")).toHaveCount(0);
+
+  /*
+   * Credits: the meter has to be a real progressbar.
+   *
+   * Without the role the fill is the only place the proportion is stated, and a
+   * screen reader gets the two numbers and nothing about how full the bar is.
+   */
+  const meter = page.locator("[data-slot=credit-meter]");
+  await expect(meter).toHaveAttribute("aria-valuenow", "1240");
+  await expect(meter).toHaveAttribute("aria-valuemax", "2000");
+  await expect(meter).toHaveAttribute(
+    "aria-valuetext",
+    "1,240 of 2,000 credits remaining",
+  );
+  // The arc tracks the numbers rather than being a hardcoded sweep. Asserted as the
+  // swept *fraction* rather than a raw dash offset, so retuning the ring's radius does
+  // not turn this into a magic-number test.
+  const swept = await meter.evaluate((el) => {
+    const arc = el.querySelectorAll("circle")[1];
+    const total = Number(arc.getAttribute("stroke-dasharray"));
+    const offset = Number(arc.getAttribute("stroke-dashoffset"));
+    return (total - offset) / total;
+  });
+  expect(swept).toBeCloseTo(1240 / 2000, 2);
+
+  // Connections: all three providers, whether linked or not — an unlinked one is an
+  // offer, so filtering it out would leave the section looking complete when nothing
+  // is connected.
+  const rows = page.locator("[data-slot=account-tile]");
+  await expect(rows).toHaveCount(3);
+  for (const name of ["YouTube", "Instagram", "TikTok"]) {
+    await expect(rows.filter({ hasText: name })).toHaveCount(1);
+  }
+
+  // The linked row shows its handle and offers to unlink; the others offer to link.
+  const youtube = rows.filter({ hasText: "YouTube" });
+  await expect(youtube.locator("[data-slot=connected-badge]")).toBeVisible();
+  await expect(youtube).toContainText("@shivansh");
+  await expect(youtube.getByRole("button", { name: "Disconnect" })).toBeVisible();
+  // `exact`, because the accessible-name match is a substring one and "Disconnect"
+  // contains "Connect" — without it this found all three rows and passed for the
+  // wrong reason.
+  await expect(page.getByRole("button", { name: "Connect", exact: true })).toHaveCount(2);
+  // ...and only the linked one, so a handle can never show on an unlinked row.
+  await expect(page.locator("[data-slot=connected-badge]")).toHaveCount(1);
+
+  // Every control here is inert, and says so rather than looking broken.
+  //
+  // `exact` throughout: accessible-name matching is a case-insensitive substring, so
+  // "Edit" also matches "Buy cr-edit-s" and "Connect" also matches "Disconnect". Both
+  // bit here — one as a strict-mode violation, one as a count of 3 where 2 was right.
+  for (const name of ["Edit", "Buy credits", "Disconnect"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute(
+      "title",
+      /not wired/,
+    );
+  }
 });
 
 test("health endpoint reports ok", async ({ request }) => {

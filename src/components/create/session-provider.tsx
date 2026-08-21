@@ -44,6 +44,14 @@ import type {
   StoryVersion,
 } from "@/types/session";
 
+/**
+ * How long the director "writes" each line.
+ *
+ * Long enough to read as thinking, short enough not to be a wait. The same beat is
+ * what the typing indicator in the chat occupies.
+ */
+const INTAKE_TYPING_MS = 1_100;
+
 let versionCounter = 0;
 const nextVersionId = () => `ver_${(versionCounter += 1)}`;
 
@@ -81,6 +89,20 @@ type SessionValue = {
    */
   finalProductionStarted: boolean;
   startFinalProduction: () => void;
+
+  /**
+   * The director's intake, before the workspace opens.
+   *
+   * `intakeStep` counts questions the user has proceeded past; `intakeTyping` is the
+   * pause while the next line is being "written". The workspace is gated on
+   * `intakeComplete`, which is both — the panels appear on the beat the closing line
+   * lands, not a second early while the director is still mid-sentence.
+   */
+  intakeStep: number;
+  intakeTyping: boolean;
+  intakeComplete: boolean;
+  intakeQuestionCount: number;
+  proceedIntake: () => void;
 
   /** Tracks carry the history; `scenes` is the active version of each. */
   tracks: SceneTrack[];
@@ -160,13 +182,11 @@ export function SessionProvider({
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [renders, setRenders] = useState<RenderJob[]>([]);
   const [rendering, setRendering] = useState(false);
+  // Only the user's own prompt is seeded. Everything the director says arrives through
+  // the intake below, so the conversation starts by being answered rather than by
+  // already having been answered.
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: nextMessageId(), from: "user", text: prompt },
-    {
-      id: nextMessageId(),
-      from: "director",
-      text: "I've drafted a story and broken it into five beats. Take a look at the Production Workspace — edit anything there and I'll keep the rest in step.",
-    },
   ]);
 
   const say = useCallback((text: string) => {
@@ -174,6 +194,11 @@ export function SessionProvider({
       ...current,
       { id: nextMessageId(), from: "director", text },
     ]);
+  }, []);
+
+  /** The user's side of the intake. Without it the opening reads as a monologue. */
+  const sayUser = useCallback((text: string) => {
+    setMessages((current) => [...current, { id: nextMessageId(), from: "user", text }]);
   }, []);
 
   /* ------------------------------------------------------- brief (story + settings) */
@@ -195,6 +220,70 @@ export function SessionProvider({
   const settings = activeStory.settings;
 
   const rationale = useMemo(() => deriveRationale(settings), [settings]);
+
+  /* --------------------------------------------------------------------- intake */
+
+  /**
+   * What the director says before the workspace opens.
+   *
+   * Two questions then a closing line. The questions are written to be *answerable
+   * with one button* — each states the call the director has made and asks to lock it
+   * in, so "Proceed" is a real answer rather than a dismissal. They quote the session's
+   * own settings, so the director is visibly reading the brief it was handed instead of
+   * reciting a script.
+   *
+   * The closing line is the one that used to be seeded into the message list, kept
+   * word for word: it is what hands the user over to the workspace.
+   */
+  const intakeScript = useMemo(
+    () => [
+      `I've read your brief. I'm planning this as a ${settings.durationSeconds}-second ${settings.platform} piece at ${settings.aspectRatio}, which is the shape that prompt wants. Shall I lock the format in?`,
+      "For tone I'm leaning cinematic and premium — hard key light, tight lenses, almost no dialogue, and a cut that moves. Happy for me to direct it that way?",
+      "I've drafted a story and broken it into five beats. Take a look at the Production Workspace — edit anything there and I'll keep the rest in step.",
+    ],
+    [settings.aspectRatio, settings.durationSeconds, settings.platform],
+  );
+
+  /** The script's last entry is the hand-off, not a question. */
+  const intakeQuestionCount = intakeScript.length - 1;
+
+  const [intakeStep, setIntakeStep] = useState(0);
+  // Starts true: the first question is already being written when the session opens.
+  const [intakeTyping, setIntakeTyping] = useState(true);
+
+  /**
+   * The gate on the workspace.
+   *
+   * Both conditions, not just the step count: at the last step the closing line is
+   * still being typed, and revealing the panels then would put them on screen before
+   * the sentence that tells you they exist.
+   */
+  const intakeComplete = intakeStep >= intakeQuestionCount && !intakeTyping;
+
+  /**
+   * Post the current line after a beat.
+   *
+   * The delay is the whole point — it is what the typing indicator is showing. Keyed on
+   * the step as well as the flag so each Proceed schedules its own line, and cleared on
+   * unmount so a fast unmount cannot post into a dead session.
+   */
+  useEffect(() => {
+    if (!intakeTyping) return;
+    const timer = window.setTimeout(() => {
+      say(intakeScript[intakeStep]);
+      setIntakeTyping(false);
+    }, INTAKE_TYPING_MS);
+    return () => window.clearTimeout(timer);
+  }, [intakeTyping, intakeStep, intakeScript, say]);
+
+  const proceedIntake = useCallback(() => {
+    // Guarded rather than trusting the button to be gone: a double-click or a stray
+    // Enter would otherwise run the step past the end of the script.
+    if (intakeTyping || intakeStep >= intakeQuestionCount) return;
+    sayUser("Proceed");
+    setIntakeStep((current) => current + 1);
+    setIntakeTyping(true);
+  }, [intakeStep, intakeQuestionCount, intakeTyping, sayUser]);
 
   /**
    * Append a revision and make it current. Nothing older is discarded.
@@ -634,6 +723,11 @@ export function SessionProvider({
       generateScenes,
       finalProductionStarted,
       startFinalProduction,
+      intakeStep,
+      intakeTyping,
+      intakeComplete,
+      intakeQuestionCount,
+      proceedIntake,
       tracks,
       scenes,
       updateScene,
@@ -669,6 +763,11 @@ export function SessionProvider({
       generateScenes,
       finalProductionStarted,
       startFinalProduction,
+      intakeStep,
+      intakeTyping,
+      intakeComplete,
+      intakeQuestionCount,
+      proceedIntake,
       tracks,
       scenes,
       updateScene,
