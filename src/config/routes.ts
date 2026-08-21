@@ -8,7 +8,9 @@ export const routes = {
   /** Full-screen composer. Outside the `(app)` group, so it has no sidebar. */
   newVideo: "/new",
   projects: "/projects",
+  exports: "/exports",
   templates: "/templates",
+  upgrade: "/upgrade",
   settings: "/settings",
   signIn: "/sign-in",
   signUp: "/sign-up",
@@ -26,7 +28,9 @@ export const protectedPrefixes = [
   routes.home,
   routes.newVideo,
   routes.projects,
+  routes.exports,
   routes.templates,
+  routes.upgrade,
   routes.settings,
 ] as const;
 

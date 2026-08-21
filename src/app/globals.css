@@ -47,7 +47,9 @@
   --color-brand-on-media: var(--brand-on-media);
   --color-warning-on-media: var(--warning-on-media);
   --color-danger-on-media: var(--danger-on-media);
+  --color-success-on-media: var(--success-on-media);
   --color-stale: var(--stale);
+  --color-success: var(--success);
   --color-glass: var(--glass);
   --color-glass-border: var(--glass-border);
   /* Was missing, so every `via-glass-sheen` / `from-glass-sheen` in the app resolved to
@@ -138,6 +140,7 @@
    */
   --warning-on-media: oklch(0.85 0.16 86);
   --danger-on-media: oklch(0.72 0.19 25);
+  --success-on-media: oklch(0.86 0.16 152);
 
   /* Glass. On a light page the frosted plate is a white veil over the
      backdrop; the sheen has to stay near-opaque or the bevel disappears. */
@@ -193,6 +196,12 @@
      rather than red on purpose: nothing here is an error, and none of it
      blocks the user. */
   --stale: oklch(0.62 0.15 76);
+
+  /* "This is live" — a linked account, a finished render. Darker than the green a
+     fill would use, because it carries 10px uppercase text on a faint tint of itself
+     and so has to clear 4.5:1 against the card rather than the 3:1 a fill gets away
+     with. Measured on that chip, not guessed: 0.52 came out at 4.34 and failed. */
+  --success: oklch(0.48 0.13 155); /* 5.06:1 */
 }
 
 .dark {
@@ -258,6 +267,7 @@
 
   /* Lifted for a dark field, same as the brand ramp. */
   --stale: oklch(0.78 0.15 78);
+  --success: oklch(0.8 0.15 158); /* 9.27:1 on the same chip */
 }
 
 @layer base {

@@ -56,11 +56,11 @@ export function ScenePicker() {
              strong enough to be seen reads as a drop shadow rather than as emitted
              light.
 
-             The strength rides on `--glow` so hover and open only restate one number,
-             and so the whole thing stays a single `box-shadow` declaration that can
-             transition. Not `shadow-brand/35`, which drives Tailwind's own
-             `--tw-shadow-color` and does not reliably survive being combined with an
-             arbitrary multi-shadow value.
+             The strength rides on `--glow` so hover and open restate one number rather
+             than a whole two-layer shadow each, and the declaration stays single and
+             transitionable. `shadow-brand/35` would also compose with an arbitrary
+             multi-shadow value — the settings panels do exactly that — but changing its
+             alpha per state means repeating the full value in every variant.
           */
           "border-brand/40 hover:border-brand/65 aria-expanded:border-brand/65",
           "[--glow:32%] hover:[--glow:60%] aria-expanded:[--glow:60%]",

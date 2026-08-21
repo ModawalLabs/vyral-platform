@@ -21,12 +21,24 @@ export const makeSceneMedia = (index: number): SceneMedia => ({
 });
 
 const BEAT_SEEDS: Record<Beat, Omit<Scene, "id" | "beat">> = {
+  /*
+   * The opening beat carries full paragraphs for Visual and Action where the others
+   * carry one line each.
+   *
+   * Deliberate, not an inconsistency: the Hook is the shot a director actually writes
+   * out, and it is the one place in the demo where the screenplay has to show that it
+   * holds prose rather than labels. It is also what the value clamp in the scene panel
+   * exists for — every other seed here sits under the 50-character threshold, so this
+   * is the only field that shows the expand pill.
+   */
   Hook: {
     durationSeconds: 2,
-    visual: "Rain-slicked alley, neon reflected in a puddle",
+    visual:
+      "Rain-slicked alley, neon reflected in a puddle — magenta off a noodle-bar sign stuttering across wet brick, the whole street cut down to two colours and a hard shine. Steam lifts from a grate at the far end and never quite clears the frame.",
     camera: "Low tracking shot, 24mm, pushing in",
     lighting: "Hard magenta key from a sign, deep shadows",
-    action: "A cyclist cuts through frame, spray lifting behind",
+    action:
+      "A cyclist cuts through frame, spray lifting behind the rear wheel in a flat arc. They clip the puddle at speed, the reflection breaks apart under the tyre, and the sign's light rakes across their shoulders as they pass out of frame left.",
     dialogue: "",
     sound: "Tyre hiss, distant bass",
     transition: "Hard cut",

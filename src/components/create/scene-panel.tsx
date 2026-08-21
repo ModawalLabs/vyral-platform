@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, ImagePlus, X } from "lucide-react";
 import Image from "next/image";
 
+import { ClampedText } from "@/components/create/clamped-text";
 import { useSession } from "@/components/create/session-provider";
 import { VersionList } from "@/components/create/version-list";
 import { activeScene } from "@/lib/session/scenes";
@@ -117,7 +118,14 @@ export function ScenePanel({
                 // long unbroken strings (lens names, hex values).
                 className="text-xs leading-relaxed break-words text-foreground/85"
               >
-                {String(scene[field.key]) || (
+                {/*
+                  Every value goes through the clamp, not just the two that are long
+                  today: it is a no-op under 50 characters, so gating it on a field name
+                  would only mean the next long value silently overflows instead.
+                */}
+                {String(scene[field.key]) ? (
+                  <ClampedText text={String(scene[field.key])} label={field.label} />
+                ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
                 {"suffix" in field && field.suffix ? field.suffix : ""}

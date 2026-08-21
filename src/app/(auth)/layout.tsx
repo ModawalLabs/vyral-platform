@@ -1,22 +1,17 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { routes } from "@/config/routes";
-import { siteConfig } from "@/config/site";
-
+/**
+ * Auth shell.
+ *
+ * Deliberately bare. It used to centre its child in a `max-w-sm` column and render a
+ * small Vyral mark above it, which suited a single card and nothing else — the sign-in
+ * screen is a full-bleed two-column composition with the glass wordmark as its own
+ * headline, and both of those fought it. That chrome moved into `sign-up`, which is the
+ * page that still wants it.
+ *
+ * `min-h-dvh` rather than `min-h-screen`: on mobile the browser chrome makes `100vh`
+ * taller than the visible viewport, which would put a centred layout slightly off.
+ */
 export default function AuthLayout({ children }: { children: ReactNode }) {
-  return (
-    <main className="flex flex-1 flex-col items-center justify-center px-4 py-16">
-      <Link href={routes.home} className="mb-8 flex items-center gap-2 font-semibold">
-        <span
-          aria-hidden
-          className="grid size-7 place-items-center rounded-md bg-foreground text-sm font-bold text-background"
-        >
-          V
-        </span>
-        {siteConfig.name}
-      </Link>
-      <div className="w-full max-w-sm">{children}</div>
-    </main>
-  );
+  return <main className="flex min-h-dvh flex-1 flex-col">{children}</main>;
 }
