@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { LoginVideo } from "@/components/auth/login-video";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { GlassWordmark } from "@/components/home/glass-wordmark";
 import { HeroBackdrop } from "@/components/home/hero-backdrop";
@@ -31,15 +32,14 @@ export default function SignInPage() {
     // fall behind the page background and vanish.
     <div className="dark relative isolate flex min-h-dvh flex-1 items-center justify-center overflow-hidden bg-background px-6 py-14 text-foreground">
       {/*
-        Brand washes only — the doodle field is off.
+        The brand washes. They stay rather than being dropped for the video, because the
+        video is absent on a phone and under reduced motion — without them those cases
+        would fall back to a flat ground, and the glass wordmark has nothing to refract on
+        a flat ground.
 
-        The washes stay because they are what the glass wordmark refracts, and because
-        they are what shows through the empty frame on the left. On a flat ground both
-        would read as grey.
-
-        TODO: this is where the background video goes. It belongs behind everything at
-        the same negative z-index the washes use, with the washes left on top of it as a
-        colour grade.
+        The video itself is not here any more. It is anchored to the frame below, since
+        covering the viewport made the composition a function of the window's aspect
+        ratio; `LoginVideo` carries the derivation.
       */}
       <HeroBackdrop doodles={false} />
 
@@ -78,7 +78,7 @@ export default function SignInPage() {
           away by a radius set further up, and `rounded-none` states the square corners
           rather than trusting that nothing else set one.
 
-          `85vh` tall and 42rem wide. Deliberately wider than the form column rather than
+          `68vh` tall and 42rem wide. Deliberately wider than the form column rather than
           matched to it — at the form's 28rem this frame was 1:1.8, narrow enough to read
           as a column of border rather than as a window.
 
@@ -90,16 +90,99 @@ export default function SignInPage() {
           and the form is the reason anyone is here.
         */}
         <div className="hidden justify-center lg:flex">
-          <div
-            aria-hidden
-            data-slot="signin-plate"
-            className="h-[85vh] w-full max-w-2xl rounded-none border-[11px] border-white"
-          />
+          {/*
+            A geometry twin: the same box as the frame, but with no border of its own.
+
+            That matters because the video is sized in percentages of this box. A
+            percentage on an absolutely-positioned child resolves against its container's
+            *padding* box, so putting the video inside the bordered element would have
+            measured it against `width - 22px` and made the composition drift as the card
+            resized. Borderless, padding box and border box are the same thing.
+
+            The dark fill matches the video's own near-black backdrop, so on a window tall
+            enough that the frame cannot cover the card there is no visible gap — see
+            `LoginVideo` on why that band is left symmetrical.
+          */}
+          <div className="relative h-[68vh] w-full max-w-2xl bg-[#0a0d12]">
+            <LoginVideo />
+
+            <div
+              aria-hidden
+              data-slot="signin-plate"
+              className={[
+                "absolute inset-0 rounded-none border-[11px] border-white",
+                /*
+                  The dim outside the frame, as one enormous spread shadow.
+
+                  A box-shadow paints outward from the border-box and never inside it, so
+                  this darkens the whole viewport *except* what the frame encloses — which
+                  is exactly the brief: the dancer reads at full strength inside the card
+                  and her dress and particles carry on, dimmer, across the rest of the
+                  page.
+
+                  Done this way rather than with four scrim panels or a masked overlay
+                  because the shadow is drawn by the frame itself: it cannot fall out of
+                  register with the thing it is cutting a hole in, at any viewport size,
+                  and it costs no extra element. `100vmax` guarantees it reaches the far
+                  corner of any window.
+
+                  This overlay comes after the video in the DOM and both are positioned,
+                  so the shadow paints over it; the form is lifted to `z-10` and stays
+                  above both.
+                */
+                "shadow-[0_0_0_100vmax_color-mix(in_oklab,#08080b_78%,transparent)]",
+              ].join(" ")}
+            />
+
+            {/*
+              The tagline, in the frame's bottom-left corner.
+
+              `inset-[11px]` makes this box exactly the frame's *inner* area — the 11px is
+              the white border's width, and the two have to stay in step or the padding
+              below would be measured from the wrong edge. Inset that way, `pl-6` and
+              `pb-22` are a true 24px and 88px in from the visible corner rather than from
+              somewhere under the border.
+
+              After the plate in the DOM so it paints over both the video and the frame,
+              and `pointer-events-none` because it is a caption sitting on top of a
+              decorative panel — it should never intercept a click meant for the page.
+            */}
+            <div className="pointer-events-none absolute inset-[11px] flex items-end">
+              <p
+                data-slot="signin-tagline"
+                className={[
+                  "pb-22 pl-6 text-2xl leading-tight font-normal tracking-tight text-white",
+                  // The video underneath is dark here — this is the floor of the shot —
+                  // but it is *moving*, so a tight shadow keeps the glyph edges hard
+                  // against whatever drifts behind them. Deliberately small and opaque
+                  // rather than a soft glow: a blur would round the very edges this is
+                  // meant to sharpen.
+                  "[text-shadow:0_1px_3px_rgb(0_0_0/0.75)]",
+                  // Greyscale antialiasing. On dark backgrounds subpixel rendering fringes
+                  // light type with colour, which is exactly what reads as "soft" here.
+                  "antialiased",
+                ].join(" ")}
+              >
+                {/*
+                  Two block spans rather than a `<br>`: the break is a design decision
+                  that has to hold, and blocks give each line its own box so the leading
+                  applies evenly. It also means no text-wrapping utility is left fighting
+                  a break it cannot see.
+                */}
+                <span className="block">Write a prompt.</span>
+                <span className="block">Get a Video. Go Viral</span>
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* No `mx-auto`: the track is now exactly the column's width, so centring in it
-            was a no-op that would quietly re-introduce an offset if the track ever grew. */}
-        <div className="w-full max-w-md">
+            was a no-op that would quietly re-introduce an offset if the track ever grew.
+
+            `relative z-10` lifts the whole column above the frame's spread shadow.
+            Without it the scrim — painted as part of a sibling's background — would sit
+            over the form's own backgrounds and mute the provider buttons. */}
+        <div className="relative z-10 w-full max-w-md">
           {/* Centred as a block, over the controls below it. The wordmark is the page's
               heading, so it is the `h1` — a separate visually hidden title would leave
               two headings competing for the same job. */}

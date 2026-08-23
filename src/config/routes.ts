@@ -7,6 +7,8 @@ export const routes = {
   home: "/",
   /** Full-screen composer. Outside the `(app)` group, so it has no sidebar. */
   newVideo: "/new",
+  /** First-run questions. Also outside `(app)` — it owns the whole viewport. */
+  onboarding: "/onboarding",
   projects: "/projects",
   exports: "/exports",
   templates: "/templates",
@@ -27,6 +29,7 @@ export type Route = (typeof routes)[keyof typeof routes];
 export const protectedPrefixes = [
   routes.home,
   routes.newVideo,
+  routes.onboarding,
   routes.projects,
   routes.exports,
   routes.templates,

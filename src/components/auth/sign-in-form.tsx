@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { FacebookMark, GoogleMark } from "@/components/auth/oauth-marks";
+import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 
 /** One treatment for both fields, so the pair reads as one control. */
@@ -27,15 +30,24 @@ const PROVIDER = cn(
  * have learned from everything else they sign into — and it puts the two one-click
  * routes above the one that costs typing.
  *
- * Nothing authenticates. There is no provider wired up, so every control says so on
- * hover rather than pretending. A client component only for the submit guard: without
- * it, Enter in either field would navigate to `?email=…&password=…`, putting a password
- * in the URL bar and the history.
+ * Nothing authenticates. All three routes go straight to onboarding, which is what
+ * makes the flow walkable end to end — the point of this build is to feel the sequence,
+ * not to check a password. Every control still says as much on hover, so it is clear the
+ * provider is not really being called.
  *
- * TODO: swap each handler for the chosen provider's call, and put the session gate in
- * `src/proxy.ts` — `protectedPrefixes` there already covers the whole workspace.
+ * The submit guard matters even so: without `preventDefault` the form would navigate to
+ * `?email=…&password=…` on Enter, putting a password in the URL bar and the history
+ * before the push ever ran.
+ *
+ * TODO: swap each handler for the chosen provider's call, send new accounts to
+ * onboarding and returning ones to the workspace, and put the session gate in
+ * `src/proxy.ts` — `protectedPrefixes` there already covers both.
  */
 export function SignInForm() {
+  const router = useRouter();
+  // One destination for all three: see the note above.
+  const enter = () => router.push(routes.onboarding);
+
   return (
     <div className="flex flex-col gap-5">
       {/*
@@ -50,8 +62,9 @@ export function SignInForm() {
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
+          onClick={enter}
           aria-label="Continue with Google"
-          title="Google sign-in is not wired up yet"
+          title="Google sign-in is not wired up yet — continues to setup"
           className={cn(PROVIDER, "bg-white text-[#1f1f1f] hover:brightness-95")}
         >
           <GoogleMark className="size-[18px]" />
@@ -60,8 +73,9 @@ export function SignInForm() {
 
         <button
           type="button"
+          onClick={enter}
           aria-label="Continue with Facebook"
-          title="Facebook sign-in is not wired up yet"
+          title="Facebook sign-in is not wired up yet — continues to setup"
           className={cn(PROVIDER, "bg-[#1877F2] text-white hover:brightness-110")}
         >
           <FacebookMark className="size-[18px]" />
@@ -129,7 +143,8 @@ export function SignInForm() {
             column actually is. */}
         <button
           type="submit"
-          title="Email sign-in is not wired up yet"
+          onClick={enter}
+          title="Email sign-in is not wired up yet — continues to setup"
           className={cn(
             PROVIDER,
             "mt-1 bg-gradient-to-r from-brand to-brand-accent text-brand-foreground",
