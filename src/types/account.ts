@@ -1,21 +1,30 @@
 import { type SocialProvider } from "@/types/social";
 
+/** One linked account on a platform. A platform can hold any number of these. */
+export type LinkedAccount = {
+  id: string;
+  /** As the provider spells it, including the leading @. */
+  handle: string;
+  connectedAt: string;
+};
+
 /**
- * One publishing destination and whether it is linked.
+ * One publishing destination and every account linked to it.
  *
- * `handle` and `connectedAt` travel together — both present or both absent — which
- * is what `connected` narrows on, so a row can never render a handle for an account
- * that is not linked.
+ * The union this replaced could only express "connected" or "not", which made a second
+ * YouTube account unrepresentable. A list says both: empty is the offer, and any length
+ * beyond that is what has been linked.
+ *
+ * **Order is priority.** `accounts[0]` is the default — the account a publish would go
+ * to — rather than a `defaultAccountId` field beside the list. A separate field is a
+ * second source of truth that can point at an account that has since been removed;
+ * position cannot. Promoting an account is a move to the front, and removing the default
+ * promotes the next one for free.
  */
-export type ConnectedAccount =
-  | { provider: SocialProvider; connected: false }
-  | {
-      provider: SocialProvider;
-      connected: true;
-      /** As the provider spells it, including the leading @. */
-      handle: string;
-      connectedAt: string;
-    };
+export type ProviderConnection = {
+  provider: SocialProvider;
+  accounts: LinkedAccount[];
+};
 
 /** The signed-in user, as the settings page needs them. */
 export type UserProfile = {

@@ -27,6 +27,18 @@ export type VideoExport = {
   createdAt: string;
   status: ExportStatus;
   /**
+   * The brief this cut was generated from.
+   *
+   * Kept on the export rather than only on the project, because a project’s prompt
+   * keeps being rewritten while an export is a record of one render — pointing this at
+   * the live project would make an old export claim it was made from a brief that did
+   * not exist yet.
+   *
+   * Required: nothing here was generated without one.
+   */
+  prompt: string;
+
+  /**
    * Poster frame.
    *
    * Present even on a failed or in-flight export, unlike `Project.thumbnailUrl`: an

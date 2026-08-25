@@ -1,7 +1,8 @@
 import "server-only";
 
 import { CURRENT_USER, userFullName, userInitials } from "@/config/current-user";
-import type { ConnectedAccount, CreditBalance, UserProfile } from "@/types/account";
+import { getSpendCycle, spentThisCycle } from "@/data/spending";
+import type { CreditBalance, ProviderConnection, UserProfile } from "@/types/account";
 
 /**
  * Account data access.
@@ -32,33 +33,60 @@ export async function getProfile(): Promise<UserProfile> {
   };
 }
 
+/**
+ * The balance, derived from the ledger rather than stated.
+ *
+ * `available` used to be a literal here and the spending panel a separate mock, which
+ * is two sources of truth for one number — the ring would have gone on saying 1,240
+ * however the charts below it added up. Subtracting the ledger from the allowance makes
+ * that disagreement unrepresentable.
+ */
 export async function getCredits(): Promise<CreditBalance> {
-  // TODO: from the billing provider once it is wired up.
+  // TODO: both come from the billing provider once it is wired up.
+  const [cycle, spent] = await Promise.all([getSpendCycle(), spentThisCycle()]);
+
   return {
-    available: 1_240,
-    allowance: 2_000,
-    renewsAt: "2026-09-01T00:00:00.000Z",
+    available: cycle.allowance - spent,
+    allowance: cycle.allowance,
+    renewsAt: cycle.renewsAt,
     creditsPerVideo: 100,
   };
 }
 
 /**
- * Every provider the workspace can publish to, linked or not.
+ * Every provider the workspace can publish to, with whatever is linked to it.
  *
  * Returns all three rather than only the linked ones: the page has to render the
  * unlinked ones as an offer, so filtering here would just push a second list of
  * "everything else" back into the component.
+ *
+ * Seeded to show all three states at once — two accounts, one account, none — so the
+ * multi-account case is visible without having to click anything first.
  */
-export async function listConnectedAccounts(): Promise<ConnectedAccount[]> {
+export async function listProviderConnections(): Promise<ProviderConnection[]> {
   // TODO: from the OAuth provider once it is wired up.
   return [
     {
       provider: "youtube",
-      connected: true,
-      handle: "@shivansh",
-      connectedAt: "2026-06-02T11:30:00.000Z",
+      accounts: [
+        {
+          id: "yt_1",
+          handle: "@shivansh",
+          connectedAt: "2026-06-02T11:30:00.000Z",
+        },
+        {
+          id: "yt_2",
+          handle: "@vyral.studio",
+          connectedAt: "2026-07-18T09:05:00.000Z",
+        },
+      ],
     },
-    { provider: "instagram", connected: false },
-    { provider: "tiktok", connected: false },
+    {
+      provider: "instagram",
+      accounts: [
+        { id: "ig_1", handle: "@vyral", connectedAt: "2026-08-04T16:40:00.000Z" },
+      ],
+    },
+    { provider: "tiktok", accounts: [] },
   ];
 }

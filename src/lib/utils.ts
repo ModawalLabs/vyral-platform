@@ -29,8 +29,20 @@ export function formatCurrency(
   );
 }
 
+/** Compact: "1.2K". For counts where the magnitude matters and the digits do not. */
 export function formatNumber(value: number, locale = "en-US") {
   return new Intl.NumberFormat(locale, { notation: "compact" }).format(value);
+}
+
+/**
+ * Grouped in full: "1,240".
+ *
+ * The counterpart to `formatNumber`, and the right one for anything a person is meant
+ * to reconcile — a credit balance, a ledger total, an axis on a chart. "1.2K remaining"
+ * next to a breakdown adding up to 1,240 reads as two different numbers.
+ */
+export function formatInteger(value: number, locale = "en-US") {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
 }
 
 const RELATIVE_UNITS = [

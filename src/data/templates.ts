@@ -47,6 +47,64 @@ const SEEDS: Array<Pick<Template, "title" | "category">> = [
  */
 const RATIO_CYCLE: Template["aspectRatio"][] = ["16:8", "8:16", "8:16"];
 
+/**
+ * The brief each seed hands over, keyed on its title.
+ *
+ * A map rather than a parallel array: reordering `SEEDS` would silently re-pair a
+ * positional list, and a template whose prompt describes a different video is worse than
+ * one with no prompt at all.
+ */
+const PROMPTS: Record<string, string> = {
+  "Neon alley chase":
+    "A chase down a rain-slick alley under neon signage, low camera, reflections carrying the colour.",
+  "Espresso pour, macro":
+    "Macro on espresso falling into a warm cup, crema blooming, single hard key light.",
+  "Sneaker drop teaser":
+    "A sneaker turning in mid-air against a hard colour backdrop, strobe-lit, dust frozen around it.",
+  "Black sand aerial":
+    "A slow aerial push over black volcanic sand, surf breaking white against it, overcast light.",
+  "VHS birthday party":
+    "A living room party shot on a camcorder, tape grain and date stamp, one blown-out overhead bulb.",
+  "Studio pedestal spin":
+    "A product turning on a matte pedestal against a seamless backdrop, crisp rim light, no cuts.",
+  "Golden hour field":
+    "A figure walking through long grass at golden hour, drifting slider move, warm halation.",
+  "Rooftop timelapse":
+    "A city rooftop from dusk into night, clouds racing, building lights coming on below.",
+  "Paper crane flock":
+    "Folded paper cranes lifting off a table in sequence, macro to wide, soft north light.",
+  "Cliffside drone pull":
+    "A drone pulling back from a cliff edge to reveal the coastline, morning haze, level horizon.",
+  "Unboxing, top-down":
+    "A top-down unboxing on a clean surface, hands only, even soft light and no shadows.",
+  "Cafe window rain":
+    "Rain running down a cafe window, the street beyond thrown out of focus, warm interior light.",
+  "Skyline light trails":
+    "Long-exposure light trails across a skyline at blue hour, traffic streaming below.",
+  "Recipe reel, overhead":
+    "An overhead recipe reel, hands working fast, cuts landing on each ingredient.",
+  "Founder talking head":
+    "A founder to camera in a bright office, shallow depth of field, natural window key.",
+};
+
+/**
+ * Models and resolutions, dealt in cycles.
+ *
+ * Cycled rather than randomised so the library is the same on every render, and cycled
+ * over lengths coprime with the seed count so a title does not always draw the same
+ * model on every page.
+ */
+const MODEL_CYCLE: Template["model"][] = [
+  "Veo3",
+  "Kling T2V",
+  "Seedance",
+  "Hunyuan",
+  "Kling",
+  "Happy Horse",
+  "Veo3",
+];
+const RESOLUTION_CYCLE: Template["resolution"][] = ["1080p", "1080p", "720p"];
+
 // TODO: remove once the API is wired up. Three pages' worth, so the pagination
 // control has something real to page through.
 const MOCK_TEMPLATES: Template[] = Array.from(
@@ -64,6 +122,10 @@ const MOCK_TEMPLATES: Template[] = Array.from(
       aspectRatio: RATIO_CYCLE[index % RATIO_CYCLE.length],
       durationSeconds: 6 + (index % 10),
       uses: 480 + index * 137,
+      // Keyed on the seed's own title, so the prompt cannot drift from the card.
+      prompt: PROMPTS[seed.title] ?? "A short cut, generated from a single prompt.",
+      model: MODEL_CYCLE[index % MODEL_CYCLE.length],
+      resolution: RESOLUTION_CYCLE[index % RESOLUTION_CYCLE.length],
     };
   },
 );

@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
 
+import { PromptBlock } from "@/components/media/prompt-block";
 import { EXPORT_STATUS_META } from "@/components/exports/export-status";
 import { Panel, PanelBevel, PanelLabel } from "@/components/ui/panel";
 import { ASPECT_RATIOS } from "@/components/home/composer-settings";
@@ -12,6 +13,9 @@ import type { VideoExport } from "@/types/export";
  * A record rather than a control panel: every value here is fixed by the time an
  * export exists, so none of it is editable. That is why it reads as a definition list
  * and not as the Production Workspace's row of setting pills.
+ *
+ * The prompt sits between the record and Download — see `PromptBlock` for why it
+ * belongs in this panel rather than under the video.
  *
  * Version is deliberately *not* here even though it is part of the same record — it is
  * the one value you can change, so it lives in the header's switcher. Listing it in
@@ -56,6 +60,8 @@ export function ExportDetails({ item }: { item: VideoExport }) {
           <Row label="Aspect ratio" value={`${aspect.value} · ${aspect.label}`} />
           <Row label="Resolution" value={item.resolution} />
         </dl>
+
+        <PromptBlock prompt={item.prompt} />
 
         {/* TODO: serves the rendered file once there is one. Disabled rather than
             inert: a download that cannot happen because the render is unfinished is a

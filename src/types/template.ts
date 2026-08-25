@@ -1,3 +1,5 @@
+import type { Resolution, SessionSettings } from "@/types/session";
+
 /**
  * A remixable starting point in the template library.
  *
@@ -19,4 +21,16 @@ export type Template = {
   durationSeconds: number;
   /** How many times it has been remixed. Drives the only number on the card. */
   uses: number;
+
+  /**
+   * The brief the template hands you, and what it was built with.
+   *
+   * A template is a starting point rather than a finished render, so this prompt is the
+   * thing you actually take away — the preview dialog shows it before you commit it to
+   * the composer. Typed off `SessionSettings` for the same reason `Project` is: one
+   * vocabulary across the app.
+   */
+  prompt: string;
+  model: SessionSettings["model"];
+  resolution: Resolution;
 };

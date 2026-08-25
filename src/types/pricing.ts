@@ -52,3 +52,21 @@ export const PLAN_FEATURES = [
 
 export const PLAN_SUBTITLE =
   "Perfect for beginners who want to explore powerful AI video without a heavy commitment.";
+
+/**
+ * Read a billing period off a URL.
+ *
+ * Deep links aim the switch at a tab — `/upgrade?plan=onetime` from the settings page's
+ * Buy credits, because a top-up is a one-off and not a change of plan. Anything
+ * unrecognised falls back to the default rather than throwing: a mistyped query string
+ * should land you on the pricing page, not on an error.
+ *
+ * `annual` is the default, as on the landing site — it is the plan to land on, and the
+ * only view that shows the "Most popular" badge.
+ */
+export const DEFAULT_BILLING_PERIOD: BillingPeriod = "annual";
+
+export function parseBillingPeriod(value: string | undefined | null): BillingPeriod {
+  const match = BILLING_PERIODS.find((period) => period.id === value);
+  return match ? match.id : DEFAULT_BILLING_PERIOD;
+}
