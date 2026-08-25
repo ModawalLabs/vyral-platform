@@ -9,6 +9,7 @@ import {
   SIDEBAR_WIDTH,
   SIDEBAR_WIDTH_COLLAPSED,
 } from "@/config/ui";
+import type { CreditBalance } from "@/types/account";
 
 /**
  * Owns the collapse state for both the sidebar and the content offset, so the
@@ -19,9 +20,12 @@ import {
  */
 export function SidebarShell({
   defaultCollapsed,
+  credits,
   children,
 }: {
   defaultCollapsed: boolean;
+  /** Passed straight through to the sidebar dial — see `SidebarCredits`. */
+  credits: CreditBalance;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -36,7 +40,7 @@ export function SidebarShell({
 
   return (
     <div className="flex min-h-full flex-1">
-      <AppSidebar collapsed={collapsed} onToggle={toggle} />
+      <AppSidebar collapsed={collapsed} onToggle={toggle} credits={credits} />
       {/* Mirrors the fixed sidebar's width so content is never underlapped;
           both sides share a curve, so the edge stays in step. */}
       <div

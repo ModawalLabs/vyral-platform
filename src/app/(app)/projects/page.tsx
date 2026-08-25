@@ -1,34 +1,27 @@
 import type { Metadata } from "next";
 
 import { PageShell } from "@/components/layout/page-shell";
-import { ProjectSection } from "@/components/projects/project-section";
-import { ProjectsToolbar } from "@/components/projects/projects-toolbar";
-import { listProjects, listRecentProjects } from "@/data/projects";
+import { ProjectsLibrary } from "@/components/projects/projects-library";
+import { listFolders, listProjects } from "@/data/projects";
 
 export const metadata: Metadata = { title: "Projects" };
 
 export default async function ProjectsPage() {
   // Independent reads, so they overlap rather than waterfall. Keeps the page
   // honest once these become real network calls.
-  const [recent, all] = await Promise.all([listRecentProjects(), listProjects()]);
+  const [projects, folders] = await Promise.all([listProjects(), listFolders()]);
 
+  /*
+   * Everything below the heading is one client component.
+   *
+   * Folders, filters and selection all read each other — see the note on
+   * `ProjectsLibrary` — so there is no seam to split on. The data still comes from
+   * the server, which is what keeps `src/data/projects.ts` `server-only` and off the
+   * client bundle.
+   */
   return (
     <PageShell title="Projects" description="Here’s what you have created so far !">
-      <div className="flex flex-col gap-10">
-        <ProjectsToolbar />
-
-        <ProjectSection
-          title="Recents"
-          projects={recent}
-          emptyMessage="Your latest generations will show up here."
-        />
-
-        <ProjectSection
-          title="All"
-          projects={all}
-          emptyMessage="No projects yet — start with New video."
-        />
-      </div>
+      <ProjectsLibrary projects={projects} folders={folders} />
     </PageShell>
   );
 }

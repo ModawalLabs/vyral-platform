@@ -4,7 +4,10 @@ import { PageShell } from "@/components/layout/page-shell";
 import { ConnectedAccounts } from "@/components/settings/connected-accounts";
 import { CreditsCard } from "@/components/settings/credits-card";
 import { ProfileCard } from "@/components/settings/profile-card";
-import { getCredits, getProfile, listConnectedAccounts } from "@/data/account";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
+import { SpendingPanel } from "@/components/settings/spending-panel";
+import { getCredits, getProfile, listProviderConnections } from "@/data/account";
+import { getSpendCycle, listSpend } from "@/data/spending";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -12,19 +15,24 @@ export default async function SettingsPage() {
   /*
    * Fetched together rather than one await after another.
    *
-   * The three are independent, so sequential awaits would stack their latency for no
+   * They are independent, so sequential awaits would stack their latency for no
    * reason once these are real network calls. They are instant today, which is exactly
    * why the shape has to be right now — a serial chain here is invisible until it is in
    * production.
    */
-  const [profile, credits, accounts] = await Promise.all([
+  const [profile, credits, connections, spend, cycle] = await Promise.all([
     getProfile(),
     getCredits(),
-    listConnectedAccounts(),
+    listProviderConnections(),
+    listSpend(),
+    getSpendCycle(),
   ]);
 
   return (
-    <PageShell title="Settings" description="Your profile, credits and connections.">
+    <PageShell
+      title="Settings"
+      description="Your profile, credits, spending and connections."
+    >
       {/* `isolate` so the wash below can sit at `-z-10` without dropping behind the
           page background. */}
       <div className="relative isolate">
@@ -41,17 +49,28 @@ export default async function SettingsPage() {
           className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-96 bg-[radial-gradient(60%_58%_at_50%_0%,color-mix(in_oklab,var(--brand)_11%,transparent),color-mix(in_oklab,var(--brand)_4%,transparent)_45%,transparent_78%)]"
         />
 
-        {/*
-           Three columns, because the first row has two unequal jobs: the profile is
-           artwork plus a field list and wants width, the credit dial is one figure and
-           does not. A 2/1 split gives each what it needs and lines their bottom edges
-           up. Below `lg` everything stacks in source order — profile, credits,
-           connections — which is also the order of importance.
-        */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          <ProfileCard profile={profile} />
-          <CreditsCard credits={credits} />
-          <ConnectedAccounts accounts={accounts} />
+        <div className="flex flex-col gap-6">
+          {/*
+             Three columns, because this row has two unequal jobs: the profile is
+             artwork plus a field list and wants width, the credit dial is one figure
+             and does not. A 2/1 split gives each what it needs and lines their bottom
+             edges up. Below `lg` the two stack in source order.
+
+             Only this row is a grid now. Connected accounts and Spending used to be
+             full-width members of it, and stacked they made the page a scroll where
+             neither was ever fully in view — they moved into the tabs below.
+          */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            <ProfileCard profile={profile} />
+            <CreditsCard credits={credits} />
+          </div>
+
+          {/* Composed here rather than inside the tabs, which take rendered panels and
+              so know nothing about accounts or ledgers. */}
+          <SettingsTabs
+            accounts={<ConnectedAccounts connections={connections} />}
+            spending={<SpendingPanel entries={spend} cycle={cycle} />}
+          />
         </div>
       </div>
     </PageShell>

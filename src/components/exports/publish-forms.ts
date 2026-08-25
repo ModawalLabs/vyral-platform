@@ -24,6 +24,15 @@ export type PublishField =
       label: string;
       placeholder?: string;
       rows?: number;
+      /**
+       * The caption or description — the one field the all-platforms form writes once
+       * and sends everywhere.
+       *
+       * Flagged rather than inferred from `kind === "textarea"`. That happens to be
+       * unambiguous today because each platform has exactly one, but a second textarea
+       * on any platform would silently make the combined form pick the wrong field.
+       */
+      shared?: boolean;
     }
   | { kind: "select"; name: string; label: string; options: readonly string[] }
   | { kind: "toggle"; name: string; label: string; defaultOn?: boolean };
@@ -58,6 +67,7 @@ export const PUBLISH_FORMS: Record<
         kind: "textarea",
         name: "description",
         label: "Description",
+        shared: true,
         placeholder: "What this video is about…",
         rows: 4,
       },
@@ -77,6 +87,7 @@ export const PUBLISH_FORMS: Record<
         kind: "textarea",
         name: "caption",
         label: "Caption",
+        shared: true,
         placeholder: "Write a caption…",
         rows: 4,
       },
@@ -102,6 +113,7 @@ export const PUBLISH_FORMS: Record<
         kind: "textarea",
         name: "caption",
         label: "Caption",
+        shared: true,
         placeholder: "Write a caption…",
         rows: 4,
       },
@@ -116,3 +128,23 @@ export const PUBLISH_FORMS: Record<
     ],
   },
 };
+
+/**
+ * The shared field for a platform, and everything else.
+ *
+ * Split here rather than in the component so both forms read the same definition: the
+ * single-platform view renders `[shared, ...extras]` in order, and the all-platforms
+ * view hoists every `shared` into one caption at the top and stacks the `extras` under
+ * their platform.
+ */
+export function sharedFieldOf(provider: SocialProvider): PublishField | undefined {
+  return PUBLISH_FORMS[provider].fields.find(
+    (field) => field.kind === "textarea" && field.shared,
+  );
+}
+
+export function extraFieldsOf(provider: SocialProvider): readonly PublishField[] {
+  return PUBLISH_FORMS[provider].fields.filter(
+    (field) => !(field.kind === "textarea" && field.shared),
+  );
+}

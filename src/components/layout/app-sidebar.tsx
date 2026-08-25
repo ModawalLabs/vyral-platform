@@ -5,21 +5,21 @@ import {
   HardDriveDownload,
   Home,
   LayoutTemplate,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Settings,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
+import { SidebarCredits } from "@/components/layout/sidebar-credits";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
 import { routes } from "@/config/routes";
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_COLLAPSED } from "@/config/ui";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
+import type { CreditBalance } from "@/types/account";
 
 const NAV_ITEMS = [
   { label: "Home", href: routes.home, Icon: Home },
@@ -34,12 +34,14 @@ const NAV_ITEMS = [
 export function AppSidebar({
   collapsed,
   onToggle,
+  credits,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  /** Fetched in the layout so every workspace page shows the same balance. */
+  credits: CreditBalance;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const toggle = onToggle;
 
   return (
@@ -159,7 +161,8 @@ export function AppSidebar({
         })}
       </nav>
 
-      {/* Footer: theme, settings, log out */}
+      {/* Footer: theme, credits, settings. Log out is on the settings page now, with
+          the account it ends — see `LogOutButton`. */}
       <div
         className={cn(
           "flex flex-col gap-2 border-t border-sidebar-border p-3",
@@ -168,27 +171,9 @@ export function AppSidebar({
       >
         <ThemeSwitch collapsed={collapsed} />
 
-        {/*
-          Upgrade sits directly above Settings, and is the one nav item that is not
-          muted grey: it is the only link here that sells something, so it carries the
-          brand colour while everything around it stays quiet. Same geometry as the
-          other footer links, so the row rhythm is untouched.
-        */}
-        <Link
-          href={routes.upgrade}
-          title={collapsed ? "Upgrade" : undefined}
-          aria-current={pathname.startsWith(routes.upgrade) ? "page" : undefined}
-          className={cn(
-            "flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none",
-            collapsed && "w-10 justify-center px-0",
-            pathname.startsWith(routes.upgrade)
-              ? "bg-brand/15 text-brand-text"
-              : "text-brand-text hover:bg-brand/10",
-          )}
-        >
-          <Sparkles className="size-[18px] shrink-0" />
-          {!collapsed && <span className="truncate">Upgrade</span>}
-        </Link>
+        {/* The dial replaces the Upgrade link that used to sit here. It goes to the same
+            page and says something the link never did — how much is left. */}
+        <SidebarCredits credits={credits} collapsed={collapsed} />
 
         <Link
           href={routes.settings}
@@ -205,31 +190,6 @@ export function AppSidebar({
           <Settings className="size-[18px] shrink-0" />
           {!collapsed && <span className="truncate">Settings</span>}
         </Link>
-
-        {/*
-          Still a button rather than a link: signing out is an action that clears a
-          session, and the navigation afterwards is a consequence of it, not the point.
-          Making it an `<a href="/sign-in">` would offer middle-click and
-          open-in-new-tab on something that is not a destination.
-
-          For now the action is only the navigation, since there is no session to clear.
-
-          TODO: call the provider's sign-out first, then push. The session gate is in
-          `src/proxy.ts`, which already covers every workspace prefix.
-        */}
-        <button
-          type="button"
-          onClick={() => router.push(routes.signIn)}
-          title={collapsed ? "Log out" : undefined}
-          aria-label={collapsed ? "Log out" : undefined}
-          className={cn(
-            "flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
-            collapsed && "w-10 justify-center px-0",
-          )}
-        >
-          <LogOut className="size-[18px] shrink-0" />
-          {!collapsed && <span className="truncate">Log out</span>}
-        </button>
       </div>
     </aside>
   );

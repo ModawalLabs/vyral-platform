@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { cn, formatCurrency, formatRelativeTime, getErrorMessage } from "@/lib/utils";
+import {
+  cn,
+  formatCurrency,
+  formatInteger,
+  formatNumber,
+  formatRelativeTime,
+  getErrorMessage,
+} from "@/lib/utils";
 
 describe("cn", () => {
   it("keeps the last conflicting Tailwind utility", () => {
@@ -47,5 +54,23 @@ describe("getErrorMessage", () => {
 
   it("falls back for unknown throwables", () => {
     expect(getErrorMessage({ nope: true })).toMatch(/went wrong/i);
+  });
+});
+
+describe("formatInteger", () => {
+  it("groups in full rather than compacting", () => {
+    // The distinction that matters: `formatNumber` would render this as "1.2K", which
+    // cannot be reconciled against a breakdown that adds up to 1,240.
+    expect(formatInteger(1_240)).toBe("1,240");
+    expect(formatNumber(1_240)).toBe("1.2K");
+  });
+
+  it("drops fractions rather than showing a fractional credit", () => {
+    expect(formatInteger(46.28)).toBe("46");
+  });
+
+  it("handles zero and negatives", () => {
+    expect(formatInteger(0)).toBe("0");
+    expect(formatInteger(-1_500)).toBe("-1,500");
   });
 });

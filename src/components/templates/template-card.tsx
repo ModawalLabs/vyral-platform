@@ -1,6 +1,10 @@
-import { Clapperboard, Sparkles } from "lucide-react";
+"use client";
+
+import { Clapperboard, Maximize2 } from "lucide-react";
 import Image from "next/image";
 
+import { aspectFact, durationFact, RATIO_NUMBER } from "@/components/preview/facts";
+import { usePreview } from "@/components/preview/preview-provider";
 import type { Template } from "@/types/template";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +20,31 @@ import { cn } from "@/lib/utils";
  * users, who never trigger `:hover`.
  */
 export function TemplateCard({ template }: { template: Template }) {
+  const preview = usePreview();
+
+  const open = () =>
+    preview.open({
+      id: template.id,
+      title: template.title,
+      eyebrow: template.category,
+      media: {
+        thumbnailUrl: template.thumbnailUrl,
+        alt: "",
+        ratio: RATIO_NUMBER[template.aspectRatio],
+      },
+      prompt: template.prompt,
+      facts: [
+        { label: "Model", value: template.model },
+        aspectFact(template.aspectRatio),
+        { label: "Resolution", value: template.resolution },
+        durationFact(template.durationSeconds),
+        { label: "Remixed", value: `${template.uses.toLocaleString("en-GB")} times` },
+      ],
+      // Inert, like the button this replaced — there is nowhere to hand a template to
+      // yet. The dialog closes either way, so it reads as pending rather than broken.
+      action: { label: "Use template", title: "Using a template is not wired up yet" },
+    });
+
   return (
     <article
       data-slot="template-card"
@@ -61,11 +90,16 @@ export function TemplateCard({ template }: { template: Template }) {
       {/*
         The action covers the whole card, so the target is the tile rather than a
         small button — and it stays a real button, so it is reachable by keyboard and
-        carries the template's name instead of a bare "Use template".
+        carries the template's name instead of a bare "Preview".
+
+        It opens the preview dialog rather than using the template outright: a template
+        is a prompt you are about to adopt, and adopting one sight-unseen is the thing
+        the dialog exists to prevent. "Use template" is the dialog's own action.
       */}
       <button
         type="button"
-        aria-label={`Use template: ${template.title}`}
+        onClick={open}
+        aria-label={`Preview template: ${template.title}`}
         className="absolute inset-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:outline-none"
       >
         <span
@@ -75,8 +109,8 @@ export function TemplateCard({ template }: { template: Template }) {
             "group-focus-within:opacity-100 group-hover:opacity-100",
           )}
         >
-          <Sparkles aria-hidden className="size-3.5" />
-          Use template
+          <Maximize2 aria-hidden className="size-3.5" />
+          Preview
         </span>
       </button>
     </article>

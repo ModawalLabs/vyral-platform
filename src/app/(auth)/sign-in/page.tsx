@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { LoginVideo } from "@/components/auth/login-video";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { GlassWordmark } from "@/components/home/glass-wordmark";
 import { HeroBackdrop } from "@/components/home/hero-backdrop";
-import { routes } from "@/config/routes";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -200,17 +198,6 @@ export default function SignInPage() {
           <div className="mt-8">
             <SignInForm />
           </div>
-
-          {/* A real link to a real route, unlike everything above it. */}
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            New here?{" "}
-            <Link
-              href={routes.signUp}
-              className="rounded font-medium text-brand-text transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:outline-none"
-            >
-              Create an account
-            </Link>
-          </p>
         </div>
       </div>
     </div>

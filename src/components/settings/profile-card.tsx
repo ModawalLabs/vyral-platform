@@ -1,6 +1,7 @@
 import { BadgeCheck, Pencil } from "lucide-react";
 
 import { DoodleField } from "@/components/home/doodle-field";
+import { LogOutButton } from "@/components/settings/log-out-button";
 import { Panel, PanelBevel } from "@/components/ui/panel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDate } from "@/lib/utils";
@@ -103,17 +104,24 @@ export function ProfileCard({ profile }: { profile: UserProfile }) {
             <p className="mt-1 truncate text-sm text-muted-foreground">{profile.email}</p>
           </div>
 
-          <button
-            type="button"
-            // Inert until there is somewhere to submit to. Not `disabled`: a greyed-out
-            // Edit on a profile reads as an account restriction rather than as an
-            // unfinished feature.
-            title="Editing your profile is not wired up yet"
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-foreground/[0.04] px-3.5 text-sm font-medium text-muted-foreground ring-1 ring-foreground/10 transition-colors ring-inset hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            <Pencil aria-hidden className="size-3.5" />
-            Edit
-          </button>
+          {/* Wrapped so the pair wraps as a unit — on a narrow panel they drop onto
+              their own line together rather than Edit staying put and Log out sliding
+              under the email. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              // Inert until there is somewhere to submit to. Not `disabled`: a greyed-out
+              // Edit on a profile reads as an account restriction rather than as an
+              // unfinished feature.
+              title="Editing your profile is not wired up yet"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-foreground/[0.04] px-3.5 text-sm font-medium text-muted-foreground ring-1 ring-foreground/10 transition-colors ring-inset hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <Pencil aria-hidden className="size-3.5" />
+              Edit
+            </button>
+
+            <LogOutButton />
+          </div>
         </div>
 
         {/*

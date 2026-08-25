@@ -4,6 +4,7 @@ import { Container } from "@/components/layout/container";
 import { PricingPlans } from "@/components/upgrade/pricing-plans";
 import { getProfile } from "@/data/account";
 import { listCreditPacks, listPlans } from "@/data/pricing";
+import { parseBillingPeriod } from "@/types/pricing";
 
 export const metadata: Metadata = {
   title: "Upgrade",
@@ -11,7 +12,11 @@ export const metadata: Metadata = {
     "Monthly, annual and one-time credit plans — from solo creators to full studios.",
 };
 
-export default async function UpgradePage() {
+export default async function UpgradePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string }>;
+}) {
   /*
    * Fetched together rather than one await after another.
    *
@@ -20,10 +25,11 @@ export default async function UpgradePage() {
    * why the shape has to be right now — a serial chain here is invisible until it is in
    * production.
    */
-  const [plans, packs, profile] = await Promise.all([
+  const [plans, packs, profile, { plan }] = await Promise.all([
     listPlans(),
     listCreditPacks(),
     getProfile(),
+    searchParams,
   ]);
 
   return (
@@ -64,7 +70,12 @@ export default async function UpgradePage() {
           </p>
         </header>
 
-        <PricingPlans plans={plans} packs={packs} currentPlan={profile.plan} />
+        <PricingPlans
+          plans={plans}
+          packs={packs}
+          currentPlan={profile.plan}
+          initialPeriod={parseBillingPeriod(plan)}
+        />
       </div>
     </Container>
   );

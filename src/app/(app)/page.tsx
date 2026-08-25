@@ -1,6 +1,6 @@
 import { ComposerHero } from "@/components/home/composer-hero";
 import { ComposerProvider } from "@/components/home/composer-provider";
-import { InspirationRail } from "@/components/home/inspiration-rail";
+import { InspirationWall } from "@/components/home/inspiration-wall";
 import { TrendingPrompts } from "@/components/home/trending-prompts";
 import { Container } from "@/components/layout/container";
 
@@ -45,7 +45,7 @@ export default function HomePage() {
 
         <Container className="relative flex flex-col gap-14 pb-20">
           <TrendingPrompts />
-          <InspirationRail />
+          <InspirationWall />
         </Container>
       </div>
     </ComposerProvider>

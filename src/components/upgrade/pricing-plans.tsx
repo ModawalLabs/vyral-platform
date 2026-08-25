@@ -6,6 +6,7 @@ import { PlanCard } from "@/components/upgrade/plan-card";
 import { PACK_VISUALS } from "@/components/upgrade/plan-visuals";
 import {
   BILLING_PERIODS,
+  DEFAULT_BILLING_PERIOD,
   type BillingPeriod,
   type CreditPack,
   type Plan,
@@ -23,19 +24,27 @@ import { cn } from "@/lib/utils";
  *   starts at the switch.
  *
  * Annual is the default, as on the landing site — it is the plan to land on, and it is
- * the only view that shows the "Most popular" badge.
+ * the only view that shows the "Most popular" badge. `initialPeriod` overrides that for
+ * a deep link: settings’ Buy credits arrives with One Time already selected.
+ *
+ * Initial value only — switching tabs afterwards does not rewrite the URL. Keeping the
+ * two in sync would mean a `router.replace` per click, and on a server-rendered page
+ * that is a round trip for a state change that is purely local.
  */
 export function PricingPlans({
   plans,
   packs,
   currentPlan,
+  initialPeriod = DEFAULT_BILLING_PERIOD,
 }: {
   plans: Plan[];
   packs: CreditPack[];
   /** The plan name from the account, e.g. `Studio`. Matched loosely — see below. */
   currentPlan: string;
+  /** Which tab to open on. From `?plan=` — see `parseBillingPeriod`. */
+  initialPeriod?: BillingPeriod;
 }) {
-  const [period, setPeriod] = useState<BillingPeriod>("annual");
+  const [period, setPeriod] = useState<BillingPeriod>(initialPeriod);
   const onetime = period === "onetime";
 
   return (

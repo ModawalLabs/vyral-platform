@@ -1172,7 +1172,7 @@ test("templates page paginates a mixed-orientation grid", async ({ page }) => {
   }
 });
 
-test("projects page renders both sections from the data layer", async ({ page }) => {
+test("projects page renders the folder rail and one filtered grid", async ({ page }) => {
   await page.goto("/projects");
 
   // Scoped to the main landmark: the sidebar has its own "New Video" button,
@@ -1181,42 +1181,151 @@ test("projects page renders both sections from the data layer", async ({ page })
 
   await expect(page.getByText(/what you have created so far/i)).toBeVisible();
   await expect(page.getByRole("searchbox", { name: /search projects/i })).toBeVisible();
-  await expect(main.getByRole("button", { name: "New folder" })).toBeVisible();
+  await expect(
+    main.getByRole("button", { name: "New folder", exact: true }),
+  ).toBeVisible();
   await expect(main.getByRole("link", { name: "New video" })).toBeVisible();
 
   // Counts come from `src/data/projects.ts`, so this catches a data-layer swap
   // that silently returns the wrong slice.
-  const recents = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Recents" }) });
-  await expect(recents.getByRole("article")).toHaveCount(3);
+  await expect(page.locator('[data-slot="folder-tile"]')).toHaveCount(3);
+  await expect(page.locator('[data-slot="new-folder-tile"]')).toHaveCount(1);
+  await expect(page.locator('[data-slot="project-card"]')).toHaveCount(10);
 
-  const all = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "All" }) });
-  await expect(all.getByRole("article")).toHaveCount(10);
+  // One grid, so the count line is the page's only claim about how many there are.
+  await expect(page.locator('p[aria-live="polite"]')).toHaveText("10 of 10 projects");
+  await expect(main.getByText("Neon alley chase")).toBeVisible();
+});
 
-  // Each card carries its label underneath.
-  await expect(all.getByText("Neon alley chase")).toBeVisible();
+test("status filter narrows the grid and leaves a removable chip", async ({ page }) => {
+  await page.goto("/projects");
+
+  const cards = page.locator('[data-slot="project-card"]');
+  const status = page.locator('[data-slot="filter-menu-trigger"][data-field="status"]');
+
+  await status.click();
+  // Each option carries what it would leave, measured against the other filters.
+  await expect(page.getByRole("menuitemradio", { name: /^Ready/ })).toContainText("8");
+  await page.getByRole("menuitemradio", { name: /^Failed/ }).click();
+
+  await expect(cards).toHaveCount(1);
+  // The pill lights up while it is narrowing; Sort never does, because an order is
+  // always in force.
+  await expect(status).toHaveAttribute("data-active", "");
+  await expect(
+    page.locator('[data-slot="filter-menu-trigger"][data-field="sort"]'),
+  ).not.toHaveAttribute("data-active", "");
+
+  const chips = page.locator('[data-slot="active-filters"]');
+  await expect(chips.getByRole("button", { name: /Failed/ })).toBeVisible();
+  await chips.getByRole("button", { name: /Failed/ }).click();
+  await expect(cards).toHaveCount(10);
+  await expect(chips).toHaveCount(0);
+});
+
+test("a folder opens in place, with its own filters and a way back", async ({ page }) => {
+  await page.goto("/projects");
+
+  const tile = page
+    .locator('[data-slot="folder-tile"]')
+    .filter({ hasText: "Pitch reel" });
+  await tile.locator("button").first().click();
+
+  const crumb = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(crumb).toContainText("Pitch reel");
+  await expect(page.locator('[data-slot="project-card"]')).toHaveCount(1);
+  // The rail belongs to the library, not to a folder.
+  await expect(page.locator('[data-slot="folder-tile"]')).toHaveCount(0);
+  await expect(page.getByRole("searchbox").first()).toHaveAttribute(
+    "placeholder",
+    "Search in Pitch reel",
+  );
+  await expect(page.getByRole("button", { name: "Add projects" })).toBeVisible();
+
+  await crumb.getByRole("button", { name: "All projects" }).click();
+  await expect(page.locator('[data-slot="project-card"]')).toHaveCount(10);
+  await expect(page.locator('[data-slot="folder-tile"]')).toHaveCount(3);
+});
+
+test("select mode files several projects into a folder at once", async ({ page }) => {
+  await page.goto("/projects");
+
+  const cards = page.locator('[data-slot="project-card"]');
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+
+  // The mode swaps the hover actions for one toggle per tile — a card cannot be
+  // both a set of buttons and a checkbox.
+  await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
+  await expect(cards.getByRole("checkbox")).toHaveCount(10);
+
+  const bar = page.locator('[data-slot="selection-bar"]');
+  await expect(bar).toContainText("0 selected");
+
+  // Two that are not already in "Vertical cuts", so the count moves by two.
+  await cards.filter({ hasText: "Neon alley chase" }).getByRole("checkbox").click();
+  await cards.filter({ hasText: "Espresso pour" }).getByRole("checkbox").click();
+  await expect(bar).toContainText("2 selected");
+  await expect(page.locator("[data-slot=project-card][data-selected]")).toHaveCount(2);
+
+  await bar.getByRole("button", { name: "Add to folder" }).click();
+  await page.getByRole("menuitem", { name: /Vertical cuts/ }).click();
+
+  await expect(
+    page.locator('[data-slot="folder-tile"]').filter({ hasText: "Vertical cuts" }),
+  ).toContainText("5 projects");
+  // Acting on the selection ends the mode: with nothing selected it has no purpose.
+  await expect(bar).toHaveCount(0);
+});
+
+test("a new folder can be named and filled in one dialog", async ({ page }) => {
+  await page.goto("/projects");
+
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: "New folder", exact: true })
+    .click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading")).toHaveText("New folder");
+  // Nothing to create until it has a name.
+  await expect(dialog.getByRole("button", { name: "Create folder" })).toBeDisabled();
+
+  await dialog.getByLabel("Folder name").fill("Sizzle reel");
+  await dialog.getByRole("checkbox").nth(0).click();
+  await dialog.getByRole("checkbox").nth(1).click();
+  await dialog.getByRole("button", { name: "Create folder" }).click();
+
+  // Prepended, because the rail is newest-first.
+  const tiles = page.locator('[data-slot="folder-tile"]');
+  await expect(tiles).toHaveCount(4);
+  await expect(tiles.first()).toContainText("Sizzle reel");
+  await expect(tiles.first()).toContainText("2 projects");
+
+  // The draft does not survive the dialog: it is unmounted while closed, so its
+  // state is rebuilt from scratch on the next open.
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: "New folder", exact: true })
+    .click();
+  await expect(page.getByRole("dialog").getByLabel("Folder name")).toHaveValue("");
+  await expect(
+    page.getByRole("dialog").getByRole("checkbox", { checked: true }),
+  ).toHaveCount(0);
 });
 
 test("project cards expose edit, preview and download on hover", async ({ page }) => {
   await page.goto("/projects");
 
-  const recents = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Recents" }) });
+  const cards = page.locator('[data-slot="project-card"]');
 
-  const ready = recents.getByRole("article").filter({ hasText: "Neon alley chase" });
+  const ready = cards.filter({ hasText: "Neon alley chase" });
   await ready.hover();
   for (const name of ["Edit", "Preview", "Download"]) {
     await expect(ready.getByRole("button", { name })).toBeVisible();
   }
 
   // A render that has not landed has nothing to play or save.
-  const processing = recents
-    .getByRole("article")
-    .filter({ hasText: "Black sand aerial" });
+  const processing = cards.filter({ hasText: "Black sand aerial" });
   await processing.hover();
   await expect(processing.getByRole("button", { name: /^Edit/ })).toBeEnabled();
   await expect(processing.getByRole("button", { name: /^Preview/ })).toBeDisabled();
@@ -1320,4 +1429,111 @@ test("unknown routes render the 404 page", async ({ page }) => {
 
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { name: /page not found/i })).toBeVisible();
+});
+
+test("the preview dialog opens from all three surfaces", async ({ page }) => {
+  const dialog = page.locator("[data-slot=preview-dialog]");
+  const frame = page.locator("[data-slot=preview-frame]");
+
+  // ── Home: the whole inspiration card is the target, and Try now moved inside.
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const card = page.locator("[data-slot=inspiration-card]").first();
+  await expect(card).toBeVisible();
+  // The card no longer carries its own Try now — a second control inside the tile
+  // would be a target within a target.
+  await expect(page.getByRole("button", { name: /^Try now$/ })).toHaveCount(0);
+
+  await card.getByRole("button").click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Model")).toBeVisible();
+  await expect(dialog.locator("[data-slot=prompt-text]")).toBeVisible();
+
+  const prompt = (await dialog.locator("[data-slot=prompt-text]").innerText()).trim();
+  await dialog.getByRole("button", { name: "Try now" }).click();
+  await expect(dialog).toHaveCount(0);
+  // The action's whole point: the prompt lands in the composer, having been read first.
+  await expect(page.locator("textarea").first()).toHaveValue(prompt);
+
+  // ── Projects: only the Preview hover action opens it, and only when there is a
+  // render to preview.
+  await page.goto("/projects");
+  const ready = page
+    .locator("[data-slot=project-card]")
+    .filter({ hasText: "Neon alley chase" });
+  await ready.hover();
+  await ready.getByRole("button", { name: /^Preview/ }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading")).toHaveText("Neon alley chase");
+  await expect(dialog.getByText("Created")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+
+  const processing = page
+    .locator("[data-slot=project-card]")
+    .filter({ hasText: "Black sand aerial" });
+  await processing.hover();
+  await expect(processing.getByRole("button", { name: /^Preview/ })).toBeDisabled();
+
+  // ── Templates: the card opens the preview; using it is the dialog's own action.
+  await page.goto("/templates");
+  await page.locator("[data-slot=template-card]").first().getByRole("button").click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Use template" })).toBeVisible();
+  // No still for a template yet, so the frame is the placeholder rather than an image.
+  await expect(frame).toHaveJSProperty("tagName", "DIV");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
+test("the preview frame keeps each picture's own shape", async ({ page }) => {
+  /*
+   * The bug this guards: a box carrying `aspect-ratio` next to a definite height does
+   * not recompute that height when `max-width` clamps it, so a 2:1 frame rendered at
+   * 1.24:1 — the picture squashed rather than scaled. Both orientations, both a real
+   * image and the placeholder, have to come out at the ratio they claim.
+   */
+  const shape = () =>
+    page.locator("[data-slot=preview-frame]").evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const stage = el.closest("[data-slot=preview-stage]")!.getBoundingClientRect();
+      return {
+        ratio: Math.round((r.width / r.height) * 100) / 100,
+        insideStage: r.width <= stage.width + 1 && r.height <= stage.height + 1,
+      };
+    });
+
+  await page.goto("/projects");
+  for (const [title, expected] of [
+    ["Neon alley chase", 1.78],
+    ["VHS birthday party", 0.56],
+  ] as const) {
+    const card = page.locator("[data-slot=project-card]").filter({ hasText: title });
+    await card.hover();
+    await card.getByRole("button", { name: /^Preview/ }).click();
+    await expect(page.locator("[data-slot=preview-dialog]")).toBeVisible();
+    const { ratio, insideStage } = await shape();
+    expect(Math.abs(ratio - expected)).toBeLessThan(0.03);
+    expect(insideStage).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-slot=preview-dialog]")).toHaveCount(0);
+  }
+
+  await page.goto("/templates");
+  for (const [orientation, expected] of [
+    ["landscape", 2],
+    ["portrait", 0.5],
+  ] as const) {
+    await page
+      .locator(`[data-slot=template-card][data-orientation=${orientation}]`)
+      .first()
+      .getByRole("button")
+      .click();
+    await expect(page.locator("[data-slot=preview-dialog]")).toBeVisible();
+    const { ratio, insideStage } = await shape();
+    expect(Math.abs(ratio - expected)).toBeLessThan(0.03);
+    expect(insideStage).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-slot=preview-dialog]")).toHaveCount(0);
+  }
 });

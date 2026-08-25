@@ -6,7 +6,8 @@ import { FacebookMark, GoogleMark } from "@/components/auth/oauth-marks";
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 
-/** One treatment for both fields, so the pair reads as one control. */
+/** The email field’s surface. Kept as a constant so it stays in step with the provider
+ * buttons above it — same height, same radius, same focus ring. */
 const FIELD = cn(
   "h-11 w-full rounded-xl bg-white/[0.04] px-3.5 text-sm text-foreground",
   "ring-1 ring-white/12 transition-colors ring-inset",
@@ -17,11 +18,23 @@ const FIELD = cn(
 const LABEL =
   "block text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase";
 
-/** Both providers get the same geometry; only the surface differs. */
+/** Geometry shared by all three ways in, including the email button below. */
 const PROVIDER = cn(
   "inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl text-sm font-semibold",
   "transition-[filter,background-color] focus-visible:ring-2 focus-visible:ring-brand/55 focus-visible:outline-none",
 );
+
+/**
+ * The surface both OAuth buttons now share.
+ *
+ * Facebook was on its own brand blue, which made the pair read as one recommended route
+ * and one alternative rather than as two equal options. On one surface the marks are the
+ * only difference between them, which is the whole point of the row.
+ *
+ * Literal hex rather than a token: this is a light chip on a page that is dark whatever
+ * the theme, so it must not follow `--background`. Same exception the brand marks take.
+ */
+const PROVIDER_LIGHT = "bg-white text-[#1f1f1f] hover:brightness-95";
 
 /**
  * The three ways in.
@@ -32,12 +45,15 @@ const PROVIDER = cn(
  *
  * Nothing authenticates. All three routes go straight to onboarding, which is what
  * makes the flow walkable end to end — the point of this build is to feel the sequence,
- * not to check a password. Every control still says as much on hover, so it is clear the
+ * not to verify anyone. Every control still says as much on hover, so it is clear the
  * provider is not really being called.
  *
+ * Email only, no password: with nothing to authenticate against, a password field asked
+ * for a secret it had no use for and could not check.
+ *
  * The submit guard matters even so: without `preventDefault` the form would navigate to
- * `?email=…&password=…` on Enter, putting a password in the URL bar and the history
- * before the push ever ran.
+ * `?email=…` on Enter, putting the address in the URL bar and the history before the
+ * push ever ran.
  *
  * TODO: swap each handler for the chosen provider's call, send new accounts to
  * onboarding and returning ones to the workspace, and put the session gate in
@@ -65,7 +81,7 @@ export function SignInForm() {
           onClick={enter}
           aria-label="Continue with Google"
           title="Google sign-in is not wired up yet — continues to setup"
-          className={cn(PROVIDER, "bg-white text-[#1f1f1f] hover:brightness-95")}
+          className={cn(PROVIDER, PROVIDER_LIGHT)}
         >
           <GoogleMark className="size-[18px]" />
           Google
@@ -76,9 +92,9 @@ export function SignInForm() {
           onClick={enter}
           aria-label="Continue with Facebook"
           title="Facebook sign-in is not wired up yet — continues to setup"
-          className={cn(PROVIDER, "bg-[#1877F2] text-white hover:brightness-110")}
+          className={cn(PROVIDER, PROVIDER_LIGHT)}
         >
-          <FacebookMark className="size-[18px]" />
+          <FacebookMark className="size-[18px] text-[#1877F2]" />
           Facebook
         </button>
       </div>
@@ -109,31 +125,6 @@ export function SignInForm() {
             type="email"
             autoComplete="email"
             placeholder="you@studio.com"
-            className={cn(FIELD, "mt-2")}
-          />
-        </div>
-
-        <div>
-          <div className="flex items-baseline justify-between gap-3">
-            <label htmlFor="signin-password" className={LABEL}>
-              Password
-            </label>
-            {/* A button, not a link: there is no reset route to point at yet, and a
-                dead `href` is worse than a control that admits it does nothing. */}
-            <button
-              type="button"
-              title="Password reset is not wired up yet"
-              className="rounded text-[11px] font-medium text-brand-text transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:outline-none"
-            >
-              Forgot password?
-            </button>
-          </div>
-          <input
-            id="signin-password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder="••••••••"
             className={cn(FIELD, "mt-2")}
           />
         </div>

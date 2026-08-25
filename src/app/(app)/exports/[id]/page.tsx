@@ -9,6 +9,7 @@ import { PublishPanel } from "@/components/exports/publish-panel";
 import { VersionSwitcher } from "@/components/exports/version-switcher";
 import { Container } from "@/components/layout/container";
 import { routes } from "@/config/routes";
+import { listProviderConnections } from "@/data/account";
 import { getExport } from "@/data/exports";
 import { formatDate } from "@/lib/utils";
 
@@ -25,7 +26,16 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function ExportDetailPage({ params }: Params) {
   const { id } = await params;
-  const item = await getExport(id);
+
+  /*
+   * Fetched together: the export and the accounts it could be published to are
+   * independent reads, and awaiting them in turn would stack their latency once these
+   * are real network calls.
+   */
+  const [item, connections] = await Promise.all([
+    getExport(id),
+    listProviderConnections(),
+  ]);
 
   // A 404 rather than a crash: a hand-typed or stale export id is a missing page, not
   // a server error.
@@ -120,7 +130,7 @@ export default async function ExportDetailPage({ params }: Params) {
           </div>
 
           <div className="lg:col-span-5">
-            <PublishPanel videoTitle={item.title} />
+            <PublishPanel item={item} connections={connections} />
           </div>
         </div>
       </div>
