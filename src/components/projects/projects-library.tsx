@@ -24,7 +24,6 @@ import {
   DEFAULT_FILTERS,
   type ProjectFilters,
 } from "@/components/projects/project-filters";
-import { ProjectMenu } from "@/components/projects/project-menu";
 import { SelectionBar } from "@/components/projects/selection-bar";
 import { BrandLink } from "@/components/ui/brand-button";
 import {
@@ -82,7 +81,6 @@ export function ProjectsLibrary({
   const [folders, setFolders] = useState(seedFolders);
   const [filters, setFilters] = useState<ProjectFilters>(DEFAULT_FILTERS);
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
-  const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<DialogState>(null);
 
@@ -123,7 +121,7 @@ export function ProjectsLibrary({
     // Prepended: the rail is newest-first, and a folder you just made is the one you
     // are about to look for.
     setFolders((current) => [folder, ...current]);
-    exitSelectMode();
+    clearSelection();
   };
 
   const renameFolder = (folderId: string, name: string) =>
@@ -154,7 +152,7 @@ export function ProjectsLibrary({
           : folder,
       ),
     );
-    exitSelectMode();
+    clearSelection();
   };
 
   const removeFromFolder = (folderId: string, projectIds: string[]) => {
@@ -166,27 +164,25 @@ export function ProjectsLibrary({
           : folder,
       ),
     );
-    exitSelectMode();
-  };
-
-  const toggleProjectInFolder = (folderId: string, projectId: string) => {
-    const folder = folders.find((entry) => entry.id === folderId);
-    if (!folder) return;
-    if (folder.projectIds.includes(projectId)) removeFromFolder(folderId, [projectId]);
-    else addToFolder(folderId, [projectId]);
+    clearSelection();
   };
 
   // ── Navigation and selection ──────────────────────────────────────────────
 
-  function exitSelectMode() {
-    setSelectMode(false);
+  /**
+   * Selection is ambient now — there is no mode to leave, only ticks to drop.
+   *
+   * Still called after every folder action: once the projects are filed, leaving them
+   * ticked would invite filing the same set twice without noticing.
+   */
+  function clearSelection() {
     setSelected(new Set());
   }
 
   /** Narrowing does not survive a move between views; the chosen order does. */
   function resetView() {
     setFilters((current) => clearFilters(current));
-    exitSelectMode();
+    clearSelection();
   }
 
   const enterFolder = (folderId: string) => {
@@ -256,7 +252,9 @@ export function ProjectsLibrary({
         bar needs has to be *here*. Without it the bar parks 24px above the viewport
         floor and lands on top of the last row of captions once you scroll to the end.
       */}
-      <section className={cn("flex min-w-0 flex-col gap-4", selectMode && "pb-24")}>
+      <section
+        className={cn("flex min-w-0 flex-col gap-4", selected.size > 0 && "pb-24")}
+      >
         {/*
           Titled the same way the rail above it is, so the page reads as two labelled
           blocks rather than one labelled block and a loose grid.
@@ -276,8 +274,6 @@ export function ProjectsLibrary({
           filters={filters}
           onFiltersChange={setFilters}
           pool={pool}
-          selectMode={selectMode}
-          onToggleSelectMode={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
           actions={
             openFolder ? null : (
               // New folder is gone from here — the rail's dashed tile already offers it,
@@ -309,33 +305,15 @@ export function ProjectsLibrary({
                 key={project.id}
                 project={project}
                 priority={index < PRIORITY_CARDS}
-                selectMode={selectMode}
                 selected={selected.has(project.id)}
                 onToggleSelect={() => toggleSelected(project.id)}
-                menu={
-                  <ProjectMenu
-                    project={project}
-                    folders={folders}
-                    onToggleFolder={(folderId) =>
-                      toggleProjectInFolder(folderId, project.id)
-                    }
-                    onNewFolder={() =>
-                      setDialog({ kind: "new", seed: new Set([project.id]) })
-                    }
-                    currentFolder={openFolder}
-                    onRemoveFromCurrent={
-                      openFolder
-                        ? () => removeFromFolder(openFolder.id, [project.id])
-                        : undefined
-                    }
-                  />
-                }
               />
             ))}
           </div>
         )}
 
-        {selectMode ? (
+        {/* Appears with the first tick and leaves with the last. Nothing arms it. */}
+        {selected.size > 0 ? (
           <SelectionBar
             count={selected.size}
             total={visible.length}
@@ -343,7 +321,7 @@ export function ProjectsLibrary({
             onAddToFolder={(folderId) => addToFolder(folderId, [...selected])}
             onNewFolder={() => setDialog({ kind: "new", seed: selected })}
             onSelectAll={() => setSelected(new Set(visible.map((p) => p.id)))}
-            onClear={exitSelectMode}
+            onClear={clearSelection}
             currentFolder={openFolder}
             onRemoveFromCurrent={
               openFolder

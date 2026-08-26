@@ -9,8 +9,8 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
 
+import { ASPECT_RATIOS } from "@/components/home/composer-settings";
 import { aspectFact, durationFact, RATIO_NUMBER } from "@/components/preview/facts";
 import { usePreview } from "@/components/preview/preview-provider";
 import { ProjectThumbnail } from "@/components/projects/project-thumbnail";
@@ -75,30 +75,33 @@ function CardAction({
 /**
  * One project in the library.
  *
- * Two modes. Normally the tile reveals edit/preview/download on hover and carries an
- * overflow menu for filing it away. In select mode all of that is replaced by a single
- * full-tile toggle — because a card that is both a set of buttons *and* a checkbox is a
- * card where every click is a guess. Entering select mode changes what a click means,
- * so it has to change what the card offers.
+ * Everything the tile offers appears on hover: edit, preview and download in the middle,
+ * and a checkbox top-left. There is no select *mode* — the checkbox is simply one more
+ * control, so filing a few projects away no longer means arming something first and
+ * disarming it after.
+ *
+ * The overflow menu that used to sit top-right is gone with it. It carried "add to
+ * folder" and "remove from folder" for a single project, and the checkbox now covers
+ * both — tick one card and the selection bar offers exactly those two actions. One route
+ * to a thing beats two.
+ *
+ * A ticked card keeps its checkbox and its ring when the pointer leaves, which is the
+ * whole reason the reveal is conditional rather than a blanket `group-hover`: a selection
+ * you cannot see while choosing the next one is not a selection.
  *
  * The two badges sit along the bottom edge rather than opposite corners, which leaves
- * the top row free for the tick and the menu. Those two are the controls; the badges
- * are labels, and labels should not be the reason a control has nowhere to go.
+ * the top-left corner free for the tick. The badges are labels, and a label should not be
+ * the reason a control has nowhere to go.
  */
 export function ProjectCard({
   project,
-  selectMode = false,
   selected = false,
   onToggleSelect,
-  menu,
   priority,
 }: {
   project: Project;
-  selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
-  /** Overflow menu, supplied by the library because only it knows the folders. */
-  menu?: ReactNode;
   priority?: boolean;
 }) {
   const preview = usePreview();
@@ -106,12 +109,15 @@ export function ProjectCard({
   // Nothing to play or save until the render lands.
   const isReady = project.status === "ready";
   const notReady = project.status === "processing" ? "still processing" : "render failed";
+  // Absent on a project that has not settled on a shape yet, so the caption simply
+  // omits the mark rather than guessing at one.
+  const aspect = ASPECT_RATIOS.find((option) => option.value === project.aspectRatio);
 
   return (
     <article
       data-slot="project-card"
       data-project={project.id}
-      data-selected={selectMode && selected ? "" : undefined}
+      data-selected={selected ? "" : undefined}
       className="group min-w-0"
     >
       <div
@@ -122,7 +128,7 @@ export function ProjectCard({
           // Selection reads as a ring on the tile itself, not only as a tick: at four
           // cards a row the ticks are far apart and the pattern of *which* are chosen
           // has to be legible without reading each corner.
-          selectMode && selected && "ring-2 ring-brand",
+          selected && "ring-2 ring-brand",
         )}
       >
         <ProjectThumbnail
@@ -132,109 +138,101 @@ export function ProjectCard({
           imageClassName="transition-transform duration-500 group-hover:scale-[1.05]"
         />
 
-        {selectMode ? (
-          /*
-           * The whole tile as one toggle.
-           *
-           * A cover button rather than a checkbox in the corner: at this size the
-           * corner is a 20px target on a 260px tile, and every pointer user would aim
-           * for the picture anyway. The real state is on the button, so a screen
-           * reader gets `checkbox` + `aria-checked` and the drawn tick stays decorative.
-           */
+        {/*
+          The checkbox.
+
+          Revealed on hover like the rest, but pinned open once ticked — and `z-20` so it
+          sits above the action overlay rather than under its scrim. Top-left, because
+          the middle belongs to the three actions and the bottom edge to the badges.
+
+          A real `checkbox` role with `aria-checked`, with the drawn box decorative: the
+          tick is a `<span>` so a screen reader hears the state once rather than twice.
+        */}
+        {onToggleSelect ? (
           <button
             type="button"
             role="checkbox"
             aria-checked={selected}
             aria-label={`Select ${project.title}`}
             onClick={onToggleSelect}
+            data-slot="project-select"
             className={cn(
-              "absolute inset-0 z-10 transition-colors focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none focus-visible:ring-inset",
-              selected ? "bg-brand/20" : "bg-black/0 hover:bg-black/25",
+              "absolute top-2.5 left-2.5 z-20 grid size-6 place-items-center rounded-md border transition-[opacity,background-color,border-color]",
+              "focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none",
+              selected
+                ? "border-brand bg-brand text-brand-foreground opacity-100"
+                : "border-white/70 bg-black/35 opacity-0 backdrop-blur-md hover:bg-black/55",
+              // Only the unticked box has to be revealed; a ticked one is already at
+              // full opacity above.
+              "group-focus-within:opacity-100 group-hover:opacity-100",
+              "[@media(hover:none)]:opacity-100",
             )}
           >
-            <span
-              aria-hidden
-              className={cn(
-                "absolute top-2.5 left-2.5 grid size-6 place-items-center rounded-full border transition-colors",
-                selected
-                  ? "border-brand bg-brand text-brand-foreground"
-                  : "border-white/70 bg-black/35 backdrop-blur-md",
-              )}
-            >
-              {selected ? <Check className="size-3.5" strokeWidth={3} /> : null}
-            </span>
+            {selected ? <Check aria-hidden className="size-3.5" strokeWidth={3} /> : null}
           </button>
-        ) : (
-          <>
-            {/*
-             * Action overlay.
-             *
-             * `group-focus-within` matters as much as `group-hover`: these controls
-             * stay focusable while transparent, so tabbing into one reveals the set
-             * instead of moving focus somewhere invisible.
-             *
-             * `(hover: none)` pins it open on touch, where there is no hover state
-             * to discover and the buttons would otherwise be unreachable.
-             */}
-            <div
-              className={cn(
-                "absolute inset-0 flex items-center justify-center gap-2",
-                "bg-gradient-to-t from-black/75 via-black/35 to-black/20 backdrop-blur-[2px]",
-                "opacity-0 transition-opacity duration-200",
-                "group-focus-within:opacity-100 group-hover:opacity-100",
-                "[@media(hover:none)]:opacity-100",
-              )}
-            >
-              <CardAction label="Edit" Icon={Pencil} delay="group-hover:delay-0" />
-              <CardAction
-                label="Preview"
-                Icon={Play}
-                disabled={!isReady}
-                disabledReason={notReady}
-                delay="group-hover:delay-75"
-                onClick={() =>
-                  preview.open({
-                    id: project.id,
-                    title: project.title,
-                    eyebrow: "Project",
-                    media: {
-                      thumbnailUrl: project.thumbnailUrl,
-                      // Empty: the dialog's own title already names this video, so a
-                      // description here would have a screen reader read it twice.
-                      alt: "",
-                      ratio: RATIO_NUMBER[project.aspectRatio ?? "16:8"],
-                    },
-                    prompt: project.prompt,
-                    facts: [
-                      { label: "Model", value: project.model },
-                      aspectFact(project.aspectRatio ?? "16:8"),
-                      { label: "Resolution", value: project.resolution },
-                      ...(project.durationSeconds
-                        ? [durationFact(project.durationSeconds)]
-                        : []),
-                      { label: "Created", value: formatDate(project.createdAt) },
-                    ],
-                    // No primary action: the card's own hover row already offers edit
-                    // and download, and a project has nowhere else to go yet.
-                  })
-                }
-              />
-              <CardAction
-                label="Download"
-                Icon={Download}
-                disabled={!isReady}
-                disabledReason={notReady}
-                delay="group-hover:delay-150"
-              />
-            </div>
+        ) : null}
 
-            {menu ? (
-              <div className="absolute top-2.5 right-2.5 z-20 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
-                {menu}
-              </div>
-            ) : null}
-          </>
-        )}
+        {/*
+         * Action overlay.
+         *
+         * `group-focus-within` matters as much as `group-hover`: these controls
+         * stay focusable while transparent, so tabbing into one reveals the set
+         * instead of moving focus somewhere invisible.
+         *
+         * `(hover: none)` pins it open on touch, where there is no hover state
+         * to discover and the buttons would otherwise be unreachable.
+         */}
+        <div
+          className={cn(
+            "absolute inset-0 flex items-center justify-center gap-2",
+            "bg-gradient-to-t from-black/75 via-black/35 to-black/20 backdrop-blur-[2px]",
+            "opacity-0 transition-opacity duration-200",
+            "group-focus-within:opacity-100 group-hover:opacity-100",
+            "[@media(hover:none)]:opacity-100",
+          )}
+        >
+          <CardAction label="Edit" Icon={Pencil} delay="group-hover:delay-0" />
+          <CardAction
+            label="Preview"
+            Icon={Play}
+            disabled={!isReady}
+            disabledReason={notReady}
+            delay="group-hover:delay-75"
+            onClick={() =>
+              preview.open({
+                id: project.id,
+                title: project.title,
+                eyebrow: "Project",
+                media: {
+                  thumbnailUrl: project.thumbnailUrl,
+                  // Empty: the dialog's own title already names this video, so a
+                  // description here would have a screen reader read it twice.
+                  alt: "",
+                  ratio: RATIO_NUMBER[project.aspectRatio ?? "16:8"],
+                },
+                prompt: project.prompt,
+                facts: [
+                  { label: "Model", value: project.model },
+                  aspectFact(project.aspectRatio ?? "16:8"),
+                  { label: "Resolution", value: project.resolution },
+                  ...(project.durationSeconds
+                    ? [durationFact(project.durationSeconds)]
+                    : []),
+                  { label: "Created", value: formatDate(project.createdAt) },
+                ],
+                // No primary action: the card's own hover row already offers edit
+                // and download, and a project has nowhere else to go yet.
+              })
+            }
+          />
+          <CardAction
+            label="Download"
+            Icon={Download}
+            disabled={!isReady}
+            disabledReason={notReady}
+            delay="group-hover:delay-150"
+          />
+        </div>
 
         {/* Rendered after the overlay so the badges stay legible on top of it. */}
         {badge ? (
@@ -260,9 +258,40 @@ export function ProjectCard({
 
       <div className="mt-2.5 min-w-0">
         <p className="truncate text-sm font-medium">{project.title}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {formatRelativeTime(project.createdAt)}
-          {project.aspectRatio ? ` · ${project.aspectRatio}` : ""}
+        {/*
+          A flex row rather than one truncating line.
+
+          The ratio used to be appended as text — "4 weeks ago · 16:8" — and `16:8` is the
+          app's own internal spelling, which says nothing to anyone who has not read the
+          composer. The icon is the one from `ASPECT_RATIOS`, so the shape shown here and
+          the shape offered when generating are the same mark.
+
+          Flex because the date has to be the part that truncates: inside a single
+          truncating line the icon is at the end and would be the first thing clipped, and
+          an icon is no use half-drawn.
+        */}
+        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="truncate">{formatRelativeTime(project.createdAt)}</span>
+
+          {aspect ? (
+            <>
+              <span aria-hidden className="opacity-50">
+                ·
+              </span>
+              {/* The name is carried by the hidden text, not an `aria-label` on the
+                  glyph: it lands in the reading order right where the ratio used to be,
+                  and `title` gives pointer users the same word on hover. */}
+              <span
+                title={aspect.label}
+                className="flex shrink-0 items-center"
+                data-slot="aspect-icon"
+                data-aspect={aspect.value}
+              >
+                <aspect.Icon aria-hidden className="size-3.5" />
+                <span className="sr-only">{aspect.label}</span>
+              </span>
+            </>
+          ) : null}
         </p>
       </div>
     </article>

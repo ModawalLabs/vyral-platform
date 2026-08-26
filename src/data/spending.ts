@@ -41,13 +41,85 @@ const PROJECT_TITLES: Record<string, string> = {
 };
 
 /**
+ * The models the mock draws from, and what each costs a second.
+ *
+ * Read back out of `profileFor` rather than restated, so this cannot drift from the
+ * composer's own pricing — the same reason `credits` is derived below rather than typed
+ * in.
+ */
+const MODEL_COSTS = {
+  Veo3: profileFor("Veo3").costPerSecond,
+  "Kling T2V": profileFor("Kling T2V").costPerSecond,
+  Kling: profileFor("Kling").costPerSecond,
+  Seedance: profileFor("Seedance").costPerSecond,
+  "Happy Horse": profileFor("Happy Horse").costPerSecond,
+  Hunyuan: profileFor("Hunyuan").costPerSecond,
+};
+
+/**
+ * Everything before the current cycle.
+ *
+ * The chart looks back six months; the ledger only ever held the current one, so a
+ * monthly view of it was a single bar. Generated rather than hand-authored because a
+ * hundred and fifty line items would bury the twenty-six that actually matter — the
+ * August ones, which are what the credits balance is derived from.
+ *
+ * **Seeded, not random.** `Math.random()` here would differ between the server render and
+ * the client one — a hydration mismatch — and would redraw the chart on every re-render,
+ * so the same month would report a different total each time you switched the period.
+ * A tiny LCG gives numbers that look unstructured and never move.
+ */
+function seeded(seed: number) {
+  let state = seed >>> 0;
+  return (max: number) => {
+    // Numerical Recipes' constants. The point is reproducibility, not statistical
+    // quality — nothing here is cryptographic or even really random.
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state % max;
+  };
+}
+
+/** March through July 2026. August is the current cycle and is authored by hand below. */
+const HISTORY_MONTHS = [2, 3, 4, 5, 6];
+
+const PROJECT_IDS = Object.keys(PROJECT_TITLES);
+const MODELS = Object.keys(MODEL_COSTS) as Array<keyof typeof MODEL_COSTS>;
+
+function historicalLedger(): Array<readonly [string, string, string, number]> {
+  const next = seeded(20_260_301);
+  const rows: Array<readonly [string, string, string, number]> = [];
+
+  for (const month of HISTORY_MONTHS) {
+    // Twelve to twenty-three renders a month — enough that a weekly bucket is never
+    // empty, varied enough that the bars are not a flat wall.
+    const count = 12 + next(12);
+
+    for (let i = 0; i < count; i++) {
+      // The real length of this month. Capping at 28 was simpler but left the 29th to
+      // the 31st permanently empty, which shows up as a dead zone at the end of every
+      // month the moment the daily window crosses one.
+      const daysInMonth = new Date(Date.UTC(2026, month + 1, 0)).getUTCDate();
+      const day = 1 + next(daysInMonth);
+      rows.push([
+        `2026-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}T12:00:00.000Z`,
+        PROJECT_IDS[next(PROJECT_IDS.length)],
+        MODELS[next(MODELS.length)],
+        6 + next(10),
+      ]);
+    }
+  }
+
+  return rows;
+}
+
+/**
  * The ledger, as `[day of August, project id, model, seconds]`.
  *
  * Written this densely because the shape of the *data* is the interesting part and a
  * hundred lines of object literals would bury it. Two things are deliberate in the
  * numbers: `p_01` appears six times, which is what a project that kept getting retaken
- * looks like, and the back half of the month is heavier than the front, so the trailing
- * rate the forecast uses is genuinely different from the cycle average.
+ * looks like, and the back half of the month is heavier than the front, so the daily bars
+ * are not a flat wall.
  *
  * TODO: gone the moment the billing provider returns real line items.
  */
@@ -80,6 +152,20 @@ const LEDGER: ReadonlyArray<readonly [number, string, string, number]> = [
   [24, "p_06", "Kling", 9],
 ];
 
+/** History and the current cycle, in one representation: `[iso, project, model, seconds]`. */
+const ALL_ROWS: Array<readonly [string, string, string, number]> = [
+  ...historicalLedger(),
+  ...LEDGER.map(
+    ([day, projectId, model, seconds]) =>
+      [
+        `2026-08-${String(day).padStart(2, "0")}T12:00:00.000Z`,
+        projectId,
+        model,
+        seconds,
+      ] as const,
+  ),
+];
+
 /**
  * Cost is derived, never stated.
  *
@@ -88,9 +174,9 @@ const LEDGER: ReadonlyArray<readonly [number, string, string, number]> = [
  * than a second set of numbers invented for a chart. Retune a model there and the
  * spending breakdown moves with it.
  */
-const ENTRIES: SpendEntry[] = LEDGER.map(([day, projectId, model, seconds], index) => ({
-  id: `sp_${String(index + 1).padStart(2, "0")}`,
-  at: `2026-08-${String(day).padStart(2, "0")}T12:00:00.000Z`,
+const ENTRIES: SpendEntry[] = ALL_ROWS.map(([at, projectId, model, seconds], index) => ({
+  id: `sp_${String(index + 1).padStart(3, "0")}`,
+  at,
   projectId,
   projectTitle: PROJECT_TITLES[projectId] ?? "Untitled project",
   model,
@@ -98,17 +184,23 @@ const ENTRIES: SpendEntry[] = LEDGER.map(([day, projectId, model, seconds], inde
   credits: seconds * profileFor(model).costPerSecond,
 }));
 
+/** Inside the window the allowance covers. Start inclusive, renewal exclusive. */
+const inCurrentCycle = (entry: SpendEntry) =>
+  entry.at >= CYCLE.startsAt && entry.at < CYCLE.renewsAt;
+
 export async function getSpendCycle(): Promise<SpendCycle> {
   return CYCLE;
 }
 
 export async function listSpend(): Promise<SpendEntry[]> {
-  // Oldest first: the burn-down accumulates forwards, and every other view sorts for
-  // itself anyway.
+  // Oldest first, which is the order the chart draws its bars in. Every other view
+  // sorts for itself anyway.
   return [...ENTRIES].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
 /** What the balance is short by. The one number `getCredits` needs from here. */
 export async function spentThisCycle(): Promise<number> {
-  return ENTRIES.reduce((sum, entry) => sum + entry.credits, 0);
+  // Only this cycle. The ledger now reaches back six months for the chart, and summing
+  // all of it here would have driven the balance — and the ring beside it — negative.
+  return ENTRIES.filter(inCurrentCycle).reduce((sum, entry) => sum + entry.credits, 0);
 }

@@ -3,16 +3,17 @@
 import { ChevronRight, Clapperboard, Cpu, TrendingUp, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { BurnDownChart } from "@/components/settings/burn-down-chart";
+import { SpendBars, type SpendUnit } from "@/components/settings/spend-bars";
 import { SpendBreakdown } from "@/components/settings/spend-breakdown";
 import {
-  burnDown,
+  bucketSpend,
   cycleSummary,
   entriesFor,
-  forecast,
   groupSpend,
   otherDimension,
+  PERIODS,
   type Dimension,
+  type Period,
   type SpendGroup,
 } from "@/components/settings/spending";
 import { Panel, PanelBevel } from "@/components/ui/panel";
@@ -51,18 +52,35 @@ export function SpendingPanel({
   const [dimension, setDimension] = useState<Dimension>("project");
   /** The row that has been opened, or null at the top level. */
   const [drilled, setDrilled] = useState<SpendGroup | null>(null);
+  const [period, setPeriod] = useState<Period>("daily");
+  const [unit, setUnit] = useState<SpendUnit>("credits");
 
-  const summary = useMemo(() => cycleSummary(entries, cycle), [entries, cycle]);
-  const points = useMemo(() => burnDown(entries, cycle), [entries, cycle]);
-  const outlook = useMemo(() => forecast(entries, cycle), [entries, cycle]);
+  /*
+   * The chart and everything under it read different slices, deliberately.
+   *
+   * The ledger reaches back six months so the weekly and monthly views have a range. The
+   * stat tiles and the breakdown stay on the current cycle: "38% of your allowance" is
+   * meaningless over six months, and the allowance is what those figures are about.
+   */
+  const cycleEntries = useMemo(
+    () =>
+      entries.filter((entry) => entry.at >= cycle.startsAt && entry.at < cycle.renewsAt),
+    [entries, cycle],
+  );
+
+  const summary = useMemo(() => cycleSummary(cycleEntries, cycle), [cycleEntries, cycle]);
+  const buckets = useMemo(
+    () => bucketSpend(entries, period, cycle.asOf),
+    [entries, period, cycle.asOf],
+  );
 
   // Which entries the breakdown is drawn from, and how they are cut. At the top level
   // that is everything by the chosen dimension; drilled, it is one group's entries by
   // the other one.
   const inner = drilled ? otherDimension(dimension) : dimension;
   const scope = useMemo(
-    () => (drilled ? entriesFor(entries, dimension, drilled.key) : entries),
-    [entries, drilled, dimension],
+    () => (drilled ? entriesFor(cycleEntries, dimension, drilled.key) : cycleEntries),
+    [cycleEntries, drilled, dimension],
   );
   const groups = useMemo(() => groupSpend(scope, inner), [scope, inner]);
 
@@ -81,8 +99,8 @@ export function SpendingPanel({
           {/* No panel label: the tab above already names this section. */}
           <div>
             <p className="text-sm text-muted-foreground">
-              Every render this cycle, and what it cost. Open a row to see the breakdown
-              underneath it.
+              Where your credits go. The chart looks back as far as you ask it to;
+              everything below it is this cycle.
             </p>
           </div>
           <p className="text-xs text-muted-foreground tabular-nums">
@@ -134,7 +152,39 @@ export function SpendingPanel({
           />
         </div>
 
-        <BurnDownChart points={points} cycle={cycle} outlook={outlook} />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold tracking-tight">When it went</h3>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented
+                label="Chart period"
+                options={PERIODS.map((entry) => ({
+                  value: entry.value,
+                  label: entry.label,
+                }))}
+                value={period}
+                onChange={setPeriod}
+                slot="chart-period"
+              />
+
+              {/* Same bars either way — one unit is a fixed multiple of the other, so
+                  only the axis and the readout change. */}
+              <Segmented
+                label="Chart unit"
+                options={[
+                  { value: "credits", label: "Credits" },
+                  { value: "dollars", label: "Dollars" },
+                ]}
+                value={unit}
+                onChange={setUnit}
+                slot="chart-unit"
+              />
+            </div>
+          </div>
+
+          <SpendBars buckets={buckets} period={period} unit={unit} />
+        </div>
 
         <div className="flex flex-col gap-3">
           {drilled ? (
@@ -151,31 +201,16 @@ export function SpendingPanel({
               {/* A segmented control, not a dropdown: there are two options and the one
                   that is not selected is the other question you might be asking, so it
                   is worth having on screen. */}
-              <div
-                role="group"
-                aria-label="Group spending by"
-                className="inline-flex items-center gap-0.5 rounded-xl bg-foreground/[0.05] p-0.5"
-              >
-                {DIMENSIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => chooseDimension(option.value)}
-                    aria-pressed={dimension === option.value}
-                    data-slot="group-by"
-                    data-dimension={option.value}
-                    className={cn(
-                      "rounded-[0.625rem] px-3 py-1.5 text-xs font-medium transition-colors",
-                      "focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:outline-none",
-                      dimension === option.value
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    By {option.label.toLowerCase()}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                label="Group spending by"
+                options={DIMENSIONS.map((option) => ({
+                  value: option.value,
+                  label: `By ${option.label.toLowerCase()}`,
+                }))}
+                value={dimension}
+                onChange={chooseDimension}
+                slot="group-by"
+              />
             </div>
           )}
 
@@ -189,6 +224,59 @@ export function SpendingPanel({
         </div>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * A small segmented switch.
+ *
+ * Three of these on one panel now — period, unit, and the group-by below — so it is one
+ * component rather than three near-identical inline blocks that would drift apart the
+ * first time one of them was retuned.
+ *
+ * `aria-pressed` on plain buttons rather than a radiogroup, matching the billing switch
+ * on the upgrade page: a radiogroup owes arrow-key navigation that none of these
+ * implement.
+ */
+function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  slot,
+}: {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  slot: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="inline-flex items-center gap-0.5 rounded-xl bg-foreground/[0.05] p-0.5"
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          data-slot={slot}
+          data-value={option.value}
+          className={cn(
+            "rounded-[0.625rem] px-3 py-1.5 text-xs font-medium transition-colors",
+            "focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:outline-none",
+            value === option.value
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
