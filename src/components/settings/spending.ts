@@ -1,3 +1,4 @@
+import { USD_PER_CREDIT } from "@/types/pricing";
 import type { SpendCycle, SpendEntry } from "@/types/spending";
 
 /**
@@ -10,6 +11,9 @@ import type { SpendCycle, SpendEntry } from "@/types/spending";
  *
  * Everything is a fold over the ledger. No total on this page is stored anywhere; if a
  * figure is wrong, exactly one function is wrong.
+ *
+ * The ledger now reaches back six months so the chart's weekly and monthly views have a
+ * range; the cycle-scoped figures are handed only the current cycle's slice by the panel.
  */
 
 export type Dimension = "project" | "model";
@@ -24,6 +28,7 @@ export type SpendGroup = {
   share: number;
   /** How many renders it took. Distinguishes "expensive" from "done a lot". */
   renders: number;
+  /** Total generated length, in seconds. What the credits actually bought. */
   seconds: number;
 };
 
@@ -103,99 +108,124 @@ export function entriesFor(
 export const otherDimension = (dimension: Dimension): Dimension =>
   dimension === "project" ? "model" : "project";
 
-export type BurnPoint = {
-  /** Days since the cycle started. */
-  day: number;
-  /** Credits left at the end of that day. */
-  remaining: number;
+/**
+ * How far each view looks back, and how it is cut.
+ *
+ * Rolling windows rather than calendar ones — "the last 30 days", not "this month". A
+ * calendar month view on the 2nd would be two bars tall and read as a collapse in
+ * spending rather than as a month that has barely started.
+ */
+export const PERIODS = [
+  { value: "daily", label: "Daily", buckets: 30, range: "Last 30 days" },
+  { value: "weekly", label: "Weekly", buckets: 12, range: "Last 12 weeks" },
+  { value: "monthly", label: "Monthly", buckets: 6, range: "Last 6 months" },
+] as const;
+
+export type Period = (typeof PERIODS)[number]["value"];
+
+export const periodMeta = (period: Period) =>
+  PERIODS.find((entry) => entry.value === period) ?? PERIODS[0];
+
+export type SpendBucket = {
+  /** ISO instant the bucket starts at. Stable, so it doubles as a React key. */
+  startsAt: string;
+  label: string;
+  credits: number;
 };
 
-/**
- * Credits remaining, one point per day from the start of the cycle to `asOf`.
+/*
+ * Everything below works in UTC.
  *
- * A point on every day rather than only on days with a render, so the line's slope is
- * literally the burn rate — flat where nothing was generated, steep where a lot was.
- * Skipping the quiet days would draw a straight line between two spikes and hide
- * exactly the pauses that make the shape readable.
+ * The ledger's timestamps are UTC, and bucketing them through the viewer's local
+ * timezone would move entries across midnight — a render at 23:00 UTC would land in
+ * yesterday's bar for anyone west of Greenwich, and the bars would differ between the
+ * server render and the client one. Formatting is pinned to UTC for the same reason.
  */
-export function burnDown(entries: readonly SpendEntry[], cycle: SpendCycle): BurnPoint[] {
-  const asOfDay = dayIndex(cycle.asOf, cycle);
-  const spentOn = new Array<number>(asOfDay + 1).fill(0);
+const DAY_LABEL = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+const MONTH_LABEL = new Intl.DateTimeFormat("en-GB", {
+  month: "short",
+  timeZone: "UTC",
+});
 
-  for (const entry of entries) {
-    const day = dayIndex(entry.at, cycle);
-    if (day >= 0 && day <= asOfDay) spentOn[day] += entry.credits;
-  }
-
-  let remaining = cycle.allowance;
-  return spentOn.map((spent, day) => {
-    remaining -= spent;
-    return { day, remaining };
-  });
+/** Midnight UTC on the day this instant falls in. */
+function startOfDay(at: Date): Date {
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
 }
 
-export type SpendForecast = {
-  /** Mean credits per day over the trailing window. */
-  perDay: number;
-  /** Days of the cycle still to come. */
-  daysLeft: number;
-  /** Credits left today. */
-  remaining: number;
-  /** What is projected to be left when the allowance renews. Never negative. */
-  remainingAtRenewal: number;
-  /**
-   * Fractional day index the balance is projected to hit zero, or `null` if the
-   * current pace does not exhaust it before renewal.
-   */
-  runsOutOnDay: number | null;
-  /** Total days in the cycle. */
-  cycleDays: number;
-};
+/** The Monday of the week this instant falls in. */
+function startOfWeek(at: Date): Date {
+  const day = startOfDay(at);
+  // `getUTCDay()` is Sunday-based; shift so Monday is 0 and Sunday is 6.
+  const offset = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - offset);
+  return day;
+}
 
-/** How many trailing days the rate is measured over. */
-export const RATE_WINDOW_DAYS = 7;
+function startOfMonth(at: Date): Date {
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1));
+}
+
+/** Which bucket an instant belongs to, for a given period. */
+export function bucketStart(at: Date, period: Period): Date {
+  if (period === "daily") return startOfDay(at);
+  if (period === "weekly") return startOfWeek(at);
+  return startOfMonth(at);
+}
+
+function stepBack(from: Date, period: Period, steps: number): Date {
+  if (period === "monthly") {
+    return new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() - steps, 1));
+  }
+  const days = period === "weekly" ? steps * 7 : steps;
+  return new Date(from.getTime() - days * MS_PER_DAY);
+}
+
+function labelFor(start: Date, period: Period): string {
+  return period === "monthly" ? MONTH_LABEL.format(start) : DAY_LABEL.format(start);
+}
 
 /**
- * Where the balance is heading.
+ * Spending, cut into bars.
  *
- * The rate comes from the trailing week, not the cycle average. Someone who barely
- * generated for a fortnight and then started a big cut every day is about to run out,
- * and an average over the whole cycle would reassure them right up until they did. The
- * window shortens rather than reaching back before the cycle started, so the first days
- * of a cycle forecast from what actually exists.
+ * Every bucket in the window is emitted, including the empty ones. A chart that skipped
+ * quiet days would put two spikes side by side and imply they were consecutive — the
+ * gaps *are* the information, exactly as they were on the line chart this replaced.
+ *
+ * Oldest first, so the bars read left to right into the present.
  */
-export function forecast(
+export function bucketSpend(
   entries: readonly SpendEntry[],
-  cycle: SpendCycle,
-): SpendForecast {
-  const asOfDay = dayIndex(cycle.asOf, cycle);
-  const cycleDays = dayIndex(cycle.renewsAt, cycle);
-  const daysLeft = Math.max(0, cycleDays - asOfDay);
+  period: Period,
+  asOf: string,
+): SpendBucket[] {
+  const { buckets } = periodMeta(period);
+  const anchor = bucketStart(new Date(asOf), period);
 
-  const windowDays = Math.min(RATE_WINDOW_DAYS, asOfDay + 1);
-  const firstDay = asOfDay - windowDays + 1;
-  const windowSpend = entries
-    .filter((entry) => {
-      const day = dayIndex(entry.at, cycle);
-      return day >= firstDay && day <= asOfDay;
-    })
-    .reduce((sum, entry) => sum + entry.credits, 0);
+  const totals = new Map<string, number>();
+  const order: string[] = [];
 
-  const perDay = windowDays === 0 ? 0 : windowSpend / windowDays;
-  const remaining = cycle.allowance - totalCredits(entries);
-  const projected = perDay * daysLeft;
+  for (let i = buckets - 1; i >= 0; i--) {
+    const key = stepBack(anchor, period, i).toISOString();
+    totals.set(key, 0);
+    order.push(key);
+  }
 
-  const runsOutOnDay =
-    perDay > 0 && projected > remaining ? asOfDay + remaining / perDay : null;
+  for (const entry of entries) {
+    const key = bucketStart(new Date(entry.at), period).toISOString();
+    // Anything older than the window, or dated after `asOf`, simply has no bucket.
+    const current = totals.get(key);
+    if (current !== undefined) totals.set(key, current + entry.credits);
+  }
 
-  return {
-    perDay,
-    daysLeft,
-    remaining,
-    remainingAtRenewal: Math.max(0, remaining - projected),
-    runsOutOnDay,
-    cycleDays,
-  };
+  return order.map((startsAt) => ({
+    startsAt,
+    label: labelFor(new Date(startsAt), period),
+    credits: totals.get(startsAt) ?? 0,
+  }));
 }
 
 /**
@@ -220,4 +250,31 @@ export function cycleSummary(entries: readonly SpendEntry[], cycle: SpendCycle) 
     topProject: topProject ?? null,
     topModel: topModel ?? null,
   };
+}
+
+/**
+ * Credits as money, in cents.
+ *
+ * Minor units because that is what `formatCurrency` takes, and because rounding once
+ * here beats rounding at each of the places that display it. Rounded rather than
+ * truncated: a breakdown that consistently reported a penny less than it cost would drift
+ * away from the total by a row-count each time.
+ */
+export function usdFor(credits: number): number {
+  return Math.round(credits * USD_PER_CREDIT * 100);
+}
+
+/**
+ * Seconds as a duration people read.
+ *
+ * Minutes once past sixty: a busy model can easily total a few hundred seconds, and
+ * "312s" is a number you have to do arithmetic on before it means anything. Seconds are
+ * kept in the minute form rather than dropped, because at this scale the difference
+ * between 1m 5s and 1m 55s is most of a video.
+ */
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`;
 }

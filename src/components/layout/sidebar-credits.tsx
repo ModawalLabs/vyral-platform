@@ -32,7 +32,6 @@ export function SidebarCredits({
   collapsed: boolean;
 }) {
   const { available, allowance } = credits;
-  const percent = allowance === 0 ? 0 : Math.round((available / allowance) * 100);
   const valueText = `${formatInteger(available)} of ${formatInteger(allowance)} credits remaining`;
 
   const href = { pathname: routes.upgrade, query: { plan: "onetime" } } as const;
@@ -100,8 +99,10 @@ export function SidebarCredits({
           {formatInteger(available)} credits
         </span>
         <span className="block truncate text-[11px] text-muted-foreground tabular-nums">
-          {percent}% left · renews{" "}
-          {formatDate(credits.renewsAt, { day: "numeric", month: "short" })}
+          {/* No percentage: the ring beside it already *is* the proportion, and printing
+              the same fact twice in two notations makes the smaller one look like a
+              second, different number. */}
+          Renews {formatDate(credits.renewsAt, { day: "numeric", month: "short" })}
         </span>
         {/* The affordance, spelled out. A plate with a number on it is a readout; this
             line is what makes it a control. */}

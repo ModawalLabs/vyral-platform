@@ -70,3 +70,18 @@ export function parseBillingPeriod(value: string | undefined | null): BillingPer
   const match = BILLING_PERIODS.find((period) => period.id === value);
   return match ? match.id : DEFAULT_BILLING_PERIOD;
 }
+
+/**
+ * What one credit costs, in dollars.
+ *
+ * Derived rather than invented: the Studio plan is $79 a month for a 2,000-credit
+ * allowance, so that is what a credit is worth to someone on it. Writing it as the
+ * division keeps the two numbers it comes from visible — a bare `0.0395` would be a magic
+ * constant nobody could check.
+ *
+ * A single rate is a simplification. A top-up pack is cheaper per credit than the plan
+ * allowance (Studio's $79 pack is 17,000 credits), so a real bill blends the two.
+ *
+ * TODO: from the billing provider, per line item, once it exists.
+ */
+export const USD_PER_CREDIT = 79 / 2_000;

@@ -5,13 +5,7 @@ import Image from "next/image";
 
 import { PromptBlock } from "@/components/media/prompt-block";
 import { brandButtonClass } from "@/components/ui/brand-button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { PreviewItem } from "@/types/preview";
 
@@ -156,19 +150,20 @@ function PreviewBody({ item, onDone }: { item: PreviewItem; onDone: () => void }
 
         <PromptBlock prompt={item.prompt} />
 
-        {/* `mt-auto` pins the footer to the bottom on a wide screen, where this column
-            is stretched to the stage's height. */}
-        <div className="mt-auto flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-          <DialogClose
-            className={cn(
-              "inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium",
-              "transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
-            )}
-          >
-            Close
-          </DialogClose>
+        {/*
+          The action, when there is one — and nothing at all when there is not.
 
-          {item.action ? (
+          There is no Close button here. The dialog already offers three ways out: the ×
+          pinned to this corner, Escape, and the backdrop. A fourth spelled-out one only
+          competed with the action beside it for the eye, and on a project — which has no
+          action — it left a footer whose sole content was a way to dismiss what you had
+          just opened.
+
+          `mt-auto` pins it to the bottom on a wide screen, where this column is stretched
+          to the stage's height.
+        */}
+        {item.action ? (
+          <div className="mt-auto flex flex-col pt-1 sm:flex-row sm:justify-end">
             <button
               type="button"
               title={item.action.title}
@@ -182,8 +177,8 @@ function PreviewBody({ item, onDone }: { item: PreviewItem; onDone: () => void }
             >
               {item.action.label}
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

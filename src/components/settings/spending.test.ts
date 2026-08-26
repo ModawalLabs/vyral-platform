@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  burnDown,
+  bucketSpend,
   cycleSummary,
   dayIndex,
   entriesFor,
-  forecast,
   groupSpend,
   otherDimension,
-  RATE_WINDOW_DAYS,
+  formatDuration,
   totalCredits,
+  usdFor,
 } from "@/components/settings/spending";
 import type { SpendCycle, SpendEntry } from "@/types/spending";
 
@@ -117,86 +117,6 @@ describe("otherDimension", () => {
   });
 });
 
-describe("burnDown", () => {
-  const points = burnDown(LEDGER, CYCLE);
-
-  it("emits one point per elapsed day, including the quiet ones", () => {
-    // Days 0–9 inclusive. The flat stretch from day 4 to day 8 is the whole reason
-    // every day gets a point — skipping them would draw a straight ramp across it.
-    expect(points).toHaveLength(10);
-    expect(points.map((p) => p.day)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(points.slice(3, 8).map((p) => p.remaining)).toEqual([820, 820, 820, 820, 820]);
-  });
-
-  it("never goes up, and ends at the balance the ledger implies", () => {
-    for (let i = 1; i < points.length; i++) {
-      expect(points[i].remaining).toBeLessThanOrEqual(points[i - 1].remaining);
-    }
-    expect(points[points.length - 1].remaining).toBe(
-      CYCLE.allowance - totalCredits(LEDGER),
-    );
-  });
-
-  it("ignores entries outside the elapsed window", () => {
-    const withFuture = [...LEDGER, entry(20, "p_1", "Veo3", 500)];
-    const last = burnDown(withFuture, CYCLE).at(-1)!;
-    expect(last.remaining).toBe(700);
-  });
-});
-
-describe("forecast", () => {
-  it("rates from the trailing week, not the cycle average", () => {
-    // 700 of the 800 credits landed on days 0–3; only 120 in the trailing window.
-    const out = forecast(LEDGER, CYCLE);
-    expect(RATE_WINDOW_DAYS).toBe(7);
-    expect(out.perDay).toBeCloseTo(120 / 7, 5);
-    expect(out.remaining).toBe(700);
-    expect(out.daysLeft).toBe(22);
-  });
-
-  it("reports the surplus when the pace does not exhaust the balance", () => {
-    const out = forecast(LEDGER, CYCLE);
-    expect(out.runsOutOnDay).toBeNull();
-    expect(out.remainingAtRenewal).toBeCloseTo(700 - (120 / 7) * 22, 5);
-  });
-
-  it("reports the day it runs out when the recent pace is heavy enough", () => {
-    // A hard week: 600 credits over days 4–10 leaves 100 and a rate that eats it in
-    // just over a day.
-    const heavy = [
-      entry(1, "p_1", "Veo3", 300),
-      entry(6, "p_1", "Veo3", 300),
-      entry(8, "p_1", "Veo3", 300),
-    ];
-    const out = forecast(heavy, CYCLE);
-    expect(out.remaining).toBe(100);
-    expect(out.perDay).toBeCloseTo(600 / 7, 5);
-    expect(out.runsOutOnDay).not.toBeNull();
-    expect(out.runsOutOnDay!).toBeCloseTo(9 + 100 / (600 / 7), 5);
-    // ...and that day is inside the cycle, which is what makes it worth saying.
-    expect(out.runsOutOnDay!).toBeLessThan(out.cycleDays);
-  });
-
-  it("shortens the window rather than reaching back before the cycle started", () => {
-    const early: SpendCycle = { ...CYCLE, asOf: "2026-08-02T00:00:00.000Z" };
-    // Two days elapsed, 100 credits spent on day 0 — a rate of 50/day, not 100/7.
-    const out = forecast([entry(1, "p_1", "Veo3", 100)], early);
-    expect(out.perDay).toBe(50);
-  });
-
-  it("never projects a negative balance", () => {
-    const out = forecast([entry(9, "p_1", "Veo3", 900)], CYCLE);
-    expect(out.remainingAtRenewal).toBe(0);
-  });
-
-  it("does not forecast a run-out from a standing start", () => {
-    const out = forecast([], CYCLE);
-    expect(out.perDay).toBe(0);
-    expect(out.runsOutOnDay).toBeNull();
-    expect(out.remainingAtRenewal).toBe(CYCLE.allowance);
-  });
-});
-
 describe("cycleSummary", () => {
   it("averages over days elapsed, not over the whole cycle", () => {
     const summary = cycleSummary(LEDGER, CYCLE);
@@ -221,24 +141,11 @@ describe("cycleSummary", () => {
 });
 
 describe("the shipped mock", () => {
-  it("adds up to exactly the credits the balance says are gone", async () => {
-    /*
-     * The reconciliation that makes the page trustworthy.
-     *
-     * The ring gauge and these charts are two views of one number. This asserts they
-     * are derived from the same place — if the ledger and the balance ever disagree,
-     * one of the two figures on screen is a lie and there is no way to tell which.
-     */
+  it("agrees with the balance about the cycle it covers", async () => {
     const { getCredits } = await import("@/data/account");
-    const { listSpend, getSpendCycle } = await import("@/data/spending");
+    const { getSpendCycle } = await import("@/data/spending");
+    const [credits, cycle] = await Promise.all([getCredits(), getSpendCycle()]);
 
-    const [credits, spend, cycle] = await Promise.all([
-      getCredits(),
-      listSpend(),
-      getSpendCycle(),
-    ]);
-
-    expect(totalCredits(spend)).toBe(credits.allowance - credits.available);
     expect(credits.allowance).toBe(cycle.allowance);
     expect(credits.renewsAt).toBe(cycle.renewsAt);
   });
@@ -252,14 +159,180 @@ describe("the shipped mock", () => {
     }
   });
 
-  it("lands entirely inside the cycle it claims to cover", async () => {
+  it("never dates an entry after the day it claims to be current to", async () => {
+    /*
+     * This used to assert the whole ledger sat *inside* the cycle. It no longer does —
+     * six months of history were added so the chart's weekly and monthly views have a
+     * range — but the future half of that bound still matters: an entry dated ahead of
+     * `asOf` would land in no bucket and silently vanish from the chart.
+     */
     const { listSpend, getSpendCycle } = await import("@/data/spending");
     const cycle = await getSpendCycle();
 
     for (const item of await listSpend()) {
-      const day = dayIndex(item.at, cycle);
-      expect(day).toBeGreaterThanOrEqual(0);
-      expect(day).toBeLessThanOrEqual(dayIndex(cycle.asOf, cycle));
+      expect(dayIndex(item.at, cycle)).toBeLessThanOrEqual(dayIndex(cycle.asOf, cycle));
     }
+  });
+});
+
+describe("usdFor", () => {
+  it("prices credits off the plan they came with", () => {
+    // $79 a month for a 2,000-credit allowance, in cents.
+    expect(usdFor(2_000)).toBe(7_900);
+    expect(usdFor(760)).toBe(3_002);
+  });
+
+  it("returns whole cents, so a column of rows cannot show a fraction of one", () => {
+    for (const credits of [1, 7, 13, 137, 999]) {
+      expect(Number.isInteger(usdFor(credits))).toBe(true);
+    }
+  });
+
+  it("is zero for nothing spent", () => {
+    expect(usdFor(0)).toBe(0);
+  });
+});
+
+describe("formatDuration", () => {
+  it("stays in seconds below a minute", () => {
+    expect(formatDuration(0)).toBe("0s");
+    expect(formatDuration(59)).toBe("59s");
+  });
+
+  it("switches to minutes, keeping the remaining seconds", () => {
+    expect(formatDuration(60)).toBe("1m");
+    expect(formatDuration(85)).toBe("1m 25s");
+    expect(formatDuration(312)).toBe("5m 12s");
+  });
+
+  it("drops a zero remainder rather than printing 2m 0s", () => {
+    expect(formatDuration(120)).toBe("2m");
+  });
+});
+
+describe("bucketSpend", () => {
+  const AS_OF = "2026-08-24T00:00:00.000Z";
+
+  const on = (iso: string, credits: number): SpendEntry => ({
+    id: iso + credits,
+    at: iso,
+    projectId: "p_1",
+    projectTitle: "Alpha",
+    model: "Veo3",
+    seconds: credits,
+    credits,
+  });
+
+  it("emits the whole window, empty buckets included", () => {
+    // The gaps are the information: a chart that skipped quiet days would put two
+    // spikes side by side and imply they were consecutive.
+    const daily = bucketSpend([on("2026-08-24T12:00:00.000Z", 40)], "daily", AS_OF);
+    expect(daily).toHaveLength(30);
+    expect(daily.filter((b) => b.credits > 0)).toHaveLength(1);
+    expect(daily.at(-1)).toMatchObject({ credits: 40, label: "24 Aug" });
+  });
+
+  it("runs oldest first, ending on the day of `asOf`", () => {
+    const daily = bucketSpend([], "daily", AS_OF);
+    expect(daily[0].startsAt).toBe("2026-07-26T00:00:00.000Z");
+    expect(daily.at(-1)!.startsAt).toBe("2026-08-24T00:00:00.000Z");
+  });
+
+  it("buckets a day by its UTC date, whatever the time of day", () => {
+    const daily = bucketSpend(
+      [on("2026-08-20T00:00:00.000Z", 10), on("2026-08-20T23:59:59.000Z", 5)],
+      "daily",
+      AS_OF,
+    );
+    expect(daily.find((b) => b.startsAt === "2026-08-20T00:00:00.000Z")?.credits).toBe(
+      15,
+    );
+  });
+
+  it("starts weeks on Monday", () => {
+    // 24 Aug 2026 is a Monday, so it opens its own week; 23 Aug is the Sunday before
+    // and belongs to the previous one.
+    const weekly = bucketSpend(
+      [on("2026-08-24T12:00:00.000Z", 10), on("2026-08-23T12:00:00.000Z", 7)],
+      "weekly",
+      AS_OF,
+    );
+    expect(weekly).toHaveLength(12);
+    expect(weekly.at(-1)).toMatchObject({
+      startsAt: "2026-08-24T00:00:00.000Z",
+      credits: 10,
+    });
+    expect(weekly.at(-2)).toMatchObject({
+      startsAt: "2026-08-17T00:00:00.000Z",
+      credits: 7,
+    });
+  });
+
+  it("cuts months on the first, and steps back by calendar month", () => {
+    const monthly = bucketSpend(
+      [on("2026-08-01T00:00:00.000Z", 9), on("2026-03-31T23:00:00.000Z", 4)],
+      "monthly",
+      AS_OF,
+    );
+    expect(monthly).toHaveLength(6);
+    expect(monthly.map((b) => b.label)).toEqual([
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+    ]);
+    // Month lengths differ, so stepping back by 30 days would have drifted off the 1st.
+    expect(monthly[0]).toMatchObject({
+      startsAt: "2026-03-01T00:00:00.000Z",
+      credits: 4,
+    });
+    expect(monthly.at(-1)?.credits).toBe(9);
+  });
+
+  it("drops anything outside the window rather than piling it on an edge bucket", () => {
+    const monthly = bucketSpend([on("2025-01-01T00:00:00.000Z", 500)], "monthly", AS_OF);
+    expect(monthly.every((b) => b.credits === 0)).toBe(true);
+
+    // ...and the same for a future-dated entry, which has no bucket either.
+    const daily = bucketSpend([on("2026-09-05T00:00:00.000Z", 500)], "daily", AS_OF);
+    expect(daily.every((b) => b.credits === 0)).toBe(true);
+  });
+});
+
+describe("the shipped ledger, against the chart", () => {
+  it("reaches back far enough for every period to have a range", async () => {
+    const { listSpend, getSpendCycle } = await import("@/data/spending");
+    const [spend, cycle] = await Promise.all([listSpend(), getSpendCycle()]);
+
+    for (const period of ["daily", "weekly", "monthly"] as const) {
+      const buckets = bucketSpend(spend, period, cycle.asOf);
+      const filled = buckets.filter((b) => b.credits > 0).length;
+      // Not merely "some data" — most of the window has to be populated, or the chart
+      // is a couple of bars floating in an empty plot.
+      expect(filled).toBeGreaterThanOrEqual(Math.ceil(buckets.length / 2));
+    }
+  });
+
+  it("keeps the balance scoped to the cycle despite the history", async () => {
+    const { getCredits } = await import("@/data/account");
+    const { listSpend, getSpendCycle } = await import("@/data/spending");
+    const [credits, spend, cycle] = await Promise.all([
+      getCredits(),
+      listSpend(),
+      getSpendCycle(),
+    ]);
+
+    /*
+     * The regression this guards: the ledger grew six months of history, and summing
+     * all of it into the balance drove `available` negative — the ring would have shown
+     * a full turn of overdraft on a plan that is 62% unused.
+     */
+    const inCycle = spend.filter((e) => e.at >= cycle.startsAt && e.at < cycle.renewsAt);
+    expect(totalCredits(inCycle)).toBe(credits.allowance - credits.available);
+    expect(credits.available).toBeGreaterThan(0);
+    // ...and there really is history outside it, or this asserts nothing.
+    expect(spend.length).toBeGreaterThan(inCycle.length);
   });
 });

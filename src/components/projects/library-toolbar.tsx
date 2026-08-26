@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointerClick, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FilterMenu } from "@/components/projects/filter-menu";
@@ -15,11 +15,10 @@ import {
   STATUS_OPTIONS,
   type ProjectFilters,
 } from "@/components/projects/project-filters";
-import { cn } from "@/lib/utils";
 import type { Project } from "@/types/project";
 
 /**
- * Filters and the mode switch, over one grid.
+ * Filters, over one grid.
  *
  * The same bar serves the whole library and a single folder — the only difference is
  * the pool it counts against, which is passed in. That is deliberate: a folder that
@@ -40,16 +39,12 @@ export function ProjectToolbar({
   filters,
   onFiltersChange,
   pool,
-  selectMode,
-  onToggleSelectMode,
   actions,
 }: {
   filters: ProjectFilters;
   onFiltersChange: (filters: ProjectFilters) => void;
   /** What the option counts are measured against — the library, or one folder. */
   pool: readonly Project[];
-  selectMode: boolean;
-  onToggleSelectMode: () => void;
   actions?: ReactNode;
 }) {
   const chips = activeChips(filters);
@@ -85,26 +80,10 @@ export function ProjectToolbar({
           align="end"
         />
 
-        {/* Its own row on a phone: at 420px these are wider than what is left of the
-            line, and a non-wrapping group there pushed buttons off the side of the page.
-            From `sm` up it goes back to riding the toolbar. */}
+        {/* Its own row on a phone: at 420px New folder and New video together are wider
+            than what is left of the line, and a non-wrapping group there pushed buttons
+            off the side of the page. From `sm` up it goes back to riding the toolbar. */}
         <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:ml-auto sm:w-auto">
-          <button
-            type="button"
-            onClick={onToggleSelectMode}
-            aria-pressed={selectMode}
-            className={cn(
-              "inline-flex h-10 items-center gap-2 rounded-xl border px-3.5 text-sm font-medium transition-colors",
-              "focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
-              selectMode
-                ? "border-brand/45 bg-brand/10 text-brand-text"
-                : "border-border bg-background hover:bg-muted",
-            )}
-          >
-            <MousePointerClick aria-hidden className="size-4" />
-            {selectMode ? "Done" : "Select"}
-          </button>
-
           {actions}
         </div>
       </div>

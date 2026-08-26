@@ -253,6 +253,31 @@ function ProviderTile({
   );
 }
 
+/**
+ * The two row controls are held back until the row is hovered.
+ *
+ * At rest a linked account is a label — a handle and, on the default, its badge. The
+ * star and the cross are things you do to it, and three tiles' worth of them showing at
+ * once turned a quiet list into a wall of icons.
+ *
+ * `opacity`, not `hidden`: the buttons keep their space, so revealing them cannot reflow
+ * the handle beside them. They stay in the tab order too, which is the point of
+ * `group-focus-within` — tabbing to one has to bring it into view, or focus lands
+ * somewhere invisible. `(hover: none)` pins them open on touch, where there is no hover
+ * to discover them with.
+ *
+ * The Default badge is deliberately *not* revealed this way. It is a label saying where a
+ * publish would go, not something you do — hiding it would mean hovering each row in turn
+ * to find out which account is the default.
+ */
+const ROW_CONTROL = cn(
+  "grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground/60",
+  "opacity-0 transition-[opacity,background-color,color]",
+  "group-focus-within/row:opacity-100 group-hover/row:opacity-100",
+  "[@media(hover:none)]:opacity-100",
+  "disabled:pointer-events-none disabled:opacity-0",
+);
+
 function AccountRow({
   account,
   provider,
@@ -274,7 +299,7 @@ function AccountRow({
     <li
       data-slot="account-row"
       data-default={isDefault ? "" : undefined}
-      className="group/row flex items-center gap-2 rounded-lg bg-foreground/[0.03] py-1.5 pr-1.5 pl-1.5 ring-1 ring-foreground/[0.06] ring-inset"
+      className="group/row flex items-center gap-2 rounded-lg bg-foreground/[0.03] py-1.5 pr-1.5 pl-1.5 ring-1 ring-foreground/[0.06] transition-colors ring-inset hover:bg-foreground/[0.06]"
     >
       {/* Initials rather than a fetched avatar: there is no account to fetch one from,
           and a generic silhouette says less than two letters of the handle. Tinted in
@@ -314,7 +339,10 @@ function AccountRow({
           onClick={onMakeDefault}
           aria-label={`Make ${account.handle} the default ${name} account`}
           title="Make default"
-          className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground/60 transition-colors hover:bg-foreground/[0.08] hover:text-brand-text focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+          className={cn(
+            ROW_CONTROL,
+            "hover:bg-foreground/[0.08] hover:text-brand-text focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none",
+          )}
         >
           <Star className="size-3.5" />
         </button>
@@ -326,7 +354,10 @@ function AccountRow({
         disabled={!canRemove}
         aria-label={`Disconnect ${account.handle} from ${name}`}
         title="Disconnect"
-        className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground/60 transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        className={cn(
+          ROW_CONTROL,
+          "hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+        )}
       >
         <X className="size-3.5" />
       </button>

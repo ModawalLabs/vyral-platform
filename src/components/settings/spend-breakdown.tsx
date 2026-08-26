@@ -2,8 +2,8 @@
 
 import { ChevronRight } from "lucide-react";
 
-import type { SpendGroup } from "@/components/settings/spending";
-import { cn, formatInteger } from "@/lib/utils";
+import { formatDuration, usdFor, type SpendGroup } from "@/components/settings/spending";
+import { cn, formatCurrency, formatInteger } from "@/lib/utils";
 
 /**
  * A ranked breakdown, one row per group.
@@ -34,17 +34,21 @@ export function SpendBreakdown({
     );
   }
 
-  // Bars are scaled to the biggest row, not to the total. Against the total, a library
-  // with twenty projects draws twenty near-invisible slivers; against the leader, the
-  // shape of the ranking is visible whatever the spread. The percentage beside each row
-  // is still the true share, so nothing is overstated.
+  /*
+   * Bars are scaled to the biggest row, not to the total.
+   *
+   * Against the total, a library with twenty projects draws twenty near-invisible
+   * slivers; against the leader, the shape of the ranking is visible whatever the
+   * spread. The cost is that the top bar is always full — it means "most", not "all" —
+   * which is why the credits and the dollar figure sit on every row rather than the bar
+   * being the only thing to read.
+   */
   const peak = Math.max(...groups.map((group) => group.credits));
 
   return (
     <ul data-slot="spend-breakdown" className="flex flex-col gap-1">
       {groups.map((group) => {
         const width = peak === 0 ? 0 : (group.credits / peak) * 100;
-        const percent = Math.round(group.share * 100);
 
         const inner = (
           <>
@@ -60,15 +64,26 @@ export function SpendBreakdown({
               {group.label}
             </span>
 
-            {/* Renders and seconds are what turn "expensive" into a reason: 230 credits
-                over six takes is a different problem from 230 over one. */}
-            <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums @min-[26rem]:block">
-              {group.renders} {group.renders === 1 ? "render" : "renders"} ·{" "}
-              {group.seconds}s
+            {/*
+              Total generated length. The thing the credits actually bought, and the only
+              column that says whether a big number is an expensive habit or simply a lot
+              of video.
+
+              First to go when the panel is narrow. Three trailing columns plus the
+              chevron leave a 640px viewport — where the fixed sidebar takes 256px of it —
+              with nothing at all for the label, which truncated to zero width. Measured
+              against the panel rather than the viewport, because the panel is far
+              narrower than a viewport breakpoint would assume.
+            */}
+            <span className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums @min-[30rem]:block">
+              {formatDuration(group.seconds)}
             </span>
 
-            <span className="w-10 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-              {percent}%
+            {/* What it cost in money, beside what it cost in credits. Credits are the
+                unit the product meters and stay the headline; this is the one people
+                reconcile against a card statement. */}
+            <span className="w-20 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+              {formatCurrency(usdFor(group.credits))}
             </span>
 
             <span className="w-16 shrink-0 text-right text-sm font-semibold tabular-nums">
@@ -86,7 +101,7 @@ export function SpendBreakdown({
               <button
                 type="button"
                 onClick={() => onDrill(group)}
-                aria-label={`${group.label}: ${formatInteger(group.credits)} credits, ${percent} percent. Open breakdown.`}
+                aria-label={`${group.label}: ${formatInteger(group.credits)} credits, ${formatCurrency(usdFor(group.credits))}, ${formatDuration(group.seconds)} of video. Open breakdown.`}
                 className={cn(
                   shared,
                   "w-full transition-colors hover:bg-foreground/[0.04]",
