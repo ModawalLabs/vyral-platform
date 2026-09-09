@@ -274,6 +274,28 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  /*
+   * Tailwind v4's preflight stopped setting `cursor: pointer` on buttons, so every
+   * control in the app showed the arrow while only anchors showed the hand — a
+   * `<button>` and an `<a>` side by side behaved differently under the pointer.
+   *
+   * Restored here rather than as a utility on each control. There are well over a
+   * hundred of them, and the one that gets missed is indistinguishable from dead UI.
+   *
+   * The roles are listed because Base UI's menus and tabs render divs rather than
+   * buttons, and they are just as clickable. `:not(:disabled)` so a control that cannot
+   * be pressed does not claim it can.
+   */
+  button:not(:disabled),
+  summary,
+  [role="button"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not(:disabled),
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="option"] {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground;
   }

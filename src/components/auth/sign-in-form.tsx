@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 
 import { FacebookMark, GoogleMark } from "@/components/auth/oauth-marks";
+import { GLASS_SURFACE } from "@/components/create/glass";
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 
@@ -18,23 +19,51 @@ const FIELD = cn(
 const LABEL =
   "block text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase";
 
-/** Geometry shared by all three ways in, including the email button below. */
+/**
+ * Geometry and behaviour shared by all three ways in.
+ *
+ * The lift is the hover: a single pixel up, with a shadow under it, so the button reads
+ * as coming off the page rather than merely changing colour. One pixel because these sit
+ * in a tight column — anything more and the row visibly reflows as the pointer crosses
+ * it. `active:translate-y-0` settles it back on press, which is what makes the lift feel
+ * like a button rather than an animation.
+ *
+ * The transition names every property the three of them animate between: the glass pair
+ * move their plate and border, the brand button moves its filter, and all three move.
+ */
 const PROVIDER = cn(
   "inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-xl text-sm font-semibold",
-  "transition-[filter,background-color] focus-visible:ring-2 focus-visible:ring-brand/55 focus-visible:outline-none",
+  "transition-[filter,background-color,border-color,transform,box-shadow] duration-200",
+  "hover:-translate-y-px active:translate-y-0",
+  "focus-visible:ring-2 focus-visible:ring-brand/55 focus-visible:outline-none",
 );
 
 /**
- * The surface both OAuth buttons now share.
+ * The surface both OAuth buttons share.
  *
  * Facebook was on its own brand blue, which made the pair read as one recommended route
  * and one alternative rather than as two equal options. On one surface the marks are the
  * only difference between them, which is the whole point of the row.
  *
- * Literal hex rather than a token: this is a light chip on a page that is dark whatever
- * the theme, so it must not follow `--background`. Same exception the brand marks take.
+ * That surface is the app's own glass — `GLASS_SURFACE`, the same plate the composer and
+ * the session bar use — rather than a second frosted look invented here. It earns its
+ * place on this page in a way it would not on a plain form: there is a video playing
+ * behind these buttons, and glass is the only treatment that lets it through instead of
+ * stamping two solid white slabs over it.
+ *
+ * `border` for the width, because the shared class only sets the border *colour*.
+ *
+ * The hover raises the plate itself — 6% to 14% white, with the border going 14% to 30%.
+ * `GLASS_SURFACE` deliberately pins its own hover so a caller's tint cannot swap the
+ * glass out for a flat fill; these override that pair rather than removing it, so the
+ * plate stays glass and simply gets denser. A brightness bump alone was too quiet to
+ * register over a moving video.
  */
-const PROVIDER_LIGHT = "bg-white text-[#1f1f1f] hover:brightness-95";
+const PROVIDER_GLASS = cn(
+  GLASS_SURFACE,
+  "border text-foreground",
+  "hover:border-white/30 hover:bg-white/[0.14] hover:shadow-lg hover:shadow-black/40",
+);
 
 /**
  * The three ways in.
@@ -81,7 +110,7 @@ export function SignInForm() {
           onClick={enter}
           aria-label="Continue with Google"
           title="Google sign-in is not wired up yet — continues to setup"
-          className={cn(PROVIDER, PROVIDER_LIGHT)}
+          className={cn(PROVIDER, PROVIDER_GLASS)}
         >
           <GoogleMark className="size-[18px]" />
           Google
@@ -92,9 +121,9 @@ export function SignInForm() {
           onClick={enter}
           aria-label="Continue with Facebook"
           title="Facebook sign-in is not wired up yet — continues to setup"
-          className={cn(PROVIDER, PROVIDER_LIGHT)}
+          className={cn(PROVIDER, PROVIDER_GLASS)}
         >
-          <FacebookMark className="size-[18px] text-[#1877F2]" />
+          <FacebookMark className="size-[18px]" />
           Facebook
         </button>
       </div>
