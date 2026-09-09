@@ -297,7 +297,7 @@ function InspirationCard({
           type="button"
           onClick={open}
           aria-label={`Preview ${item.label}: ${item.prompt}`}
-          className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:outline-none"
+          className="absolute inset-0 z-10 rounded-2xl focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:outline-none"
         />
       </div>
     </article>

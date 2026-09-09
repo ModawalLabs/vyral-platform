@@ -138,7 +138,7 @@ export default function SignInPage() {
               `inset-[11px]` makes this box exactly the frame's *inner* area — the 11px is
               the white border's width, and the two have to stay in step or the padding
               below would be measured from the wrong edge. Inset that way, `pl-6` and
-              `pb-22` are a true 24px and 88px in from the visible corner rather than from
+              `pb-16` are a true 24px and 64px in from the visible corner rather than from
               somewhere under the border.
 
               After the plate in the DOM so it paints over both the video and the frame,
@@ -149,7 +149,7 @@ export default function SignInPage() {
               <p
                 data-slot="signin-tagline"
                 className={[
-                  "pb-22 pl-6 text-2xl leading-tight font-normal tracking-tight text-white",
+                  "pb-16 pl-6 text-2xl leading-tight font-normal tracking-tight text-white",
                   // The video underneath is dark here — this is the floor of the shot —
                   // but it is *moving*, so a tight shadow keeps the glyph edges hard
                   // against whatever drifts behind them. Deliberately small and opaque
